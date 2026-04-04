@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(curl -s http://localhost:3000/ -o /dev/null -w \"%{http_code}\")",
+      "Bash(curl -s http://localhost:3000/admin.html -o /dev/null -w \"%{http_code}\")",
+      "Bash(pkill -f \"node server.js\")",
+      "Bash(curl -s http://localhost:8080/admin.html -o /dev/null -w \"%{http_code}\")",
+      "Bash(powershell -Command \"Set-Content -Path ''C:/project/Question/start.bat'' -Encoding \\([System.Text.Encoding]::GetEncoding\\(1251\\)\\) -Value \\(Get-Content ''C:/project/Question/start.bat'' -Raw\\)\")",
+      "Bash(powershell -Command \":*)",
+      "Bash(curl -s http://localhost:8080/api/network-info)",
+      "Bash(powershell -Command \"Get-Process node -ErrorAction SilentlyContinue | Stop-Process -Force\")",
+      "Bash(node server.js)",
+      "Bash(curl -s \"http://localhost:8080/api/qr?url=http://test.com&size=200\" -o /dev/null -w \"%{http_code} %{content_type}\")",
+      "Bash(node -e \"const QRCode=require\\(''qrcode''\\); QRCode.toBuffer\\(''http://test.com'',{width:100},\\(e,b\\)=>console.log\\(e?''ERR:''+e:''OK bytes:''+b.length\\)\\)\")",
+      "Bash(curl -s http://localhost:8080/ -o /dev/null -w \"%{http_code} → %{redirect_url}\")"
+    ]
+  }
+}

@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Эфир — Голосование</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,700;1,400;1,700&family=Oswald:wght@400;700&family=Montserrat:ital,wght@0,400;0,700;1,400;1,700&family=Inter:wght@400;700&family=Bebas+Neue&display=swap" rel="stylesheet">
+<style id="static-style">
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 100%; height: 100%;
+    font-family: var(--font-family, 'Segoe UI', Arial, sans-serif);
+    color: var(--text-color, #fff);
+    overflow: hidden;
+    /* background set by dynamic style */
+  }
+
+  .scene {
+    width: 100vw; height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+    padding: 4%;
+  }
+
+  /* ── QR ─────────────────────────────────────────── */
+  .qr-card {
+    background: rgba(15,17,30,0.88);
+    border: 2px solid rgba(99,102,241,0.4);
+    border-radius: 24px; padding: 40px 48px;
+    display: flex; flex-direction: column;
+    align-items: center; gap: 20px;
+    backdrop-filter: blur(12px);
+    animation: fadeIn 0.5s ease;
+  }
+  .qr-label {
+    font-size: calc(clamp(14px, 2.5vw, 22px) * var(--text-scale, 1));
+    color: #a5b4fc; font-weight: 500; text-align: center;
+    font-style: var(--font-italic, normal);
+  }
+  #qrCanvas { border-radius: 12px; }
+  .qr-url {
+    font-size: calc(clamp(12px, 1.8vw, 18px) * var(--text-scale, 1));
+    color: #6366f1; font-weight: 600; letter-spacing: 0.5px;
+  }
+
+  /* ── Question ───────────────────────────────────── */
+  .question-card {
+    background: rgba(15,17,30,0.88);
+    border: 2px solid rgba(99,102,241,0.4);
+    border-radius: 24px;
+    padding: clamp(24px, 4vw, 56px);
+    width: 100%; max-width: 960px;
+    text-align: center;
+    backdrop-filter: blur(12px);
+    animation: fadeIn 0.5s ease;
+  }
+  .question-label {
+    font-size: calc(clamp(11px, 1.5vw, 16px) * var(--text-scale, 1));
+    text-transform: uppercase; letter-spacing: 2px;
+    color: #6366f1; margin-bottom: 16px; font-weight: 600;
+  }
+  .question-text {
+    font-size: calc(clamp(22px, 4.5vw, 56px) * var(--text-scale, 1));
+    font-weight: var(--font-weight, 700);
+    font-style: var(--font-italic, normal);
+    line-height: 1.2; color: var(--text-color, #fff);
+  }
+
+  /* ── Both ───────────────────────────────────────── */
+  .both-card {
+    background: rgba(15,17,30,0.88);
+    border: 2px solid rgba(99,102,241,0.4);
+    border-radius: 24px;
+    padding: clamp(20px, 3.5vw, 48px);
+    width: 100%;
+    display: flex; align-items: center;
+    gap: clamp(24px, 4vw, 60px);
+    backdrop-filter: blur(12px);
+    animation: fadeIn 0.5s ease;
+  }
+  .both-qr { flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .both-qr .qr-url { font-size: calc(clamp(11px, 1.3vw, 15px) * var(--text-scale, 1)); }
+  .both-question { flex: 1; }
+  .both-question .question-label { text-align: left; }
+  .both-question .question-text { text-align: left; }
+
+  /* ── Results ────────────────────────────────────── */
+  .results-card {
+    background: rgba(15,17,30,0.88);
+    border: 2px solid rgba(99,102,241,0.4);
+    border-radius: 24px;
+    padding: clamp(20px, 3.5vw, 48px);
+    width: 100%;
+    backdrop-filter: blur(12px);
+    animation: fadeIn 0.5s ease;
+  }
+  .results-header { margin-bottom: clamp(16px, 2.5vw, 32px); }
+  .results-question {
+    font-size: calc(clamp(16px, 2.8vw, 34px) * var(--text-scale, 1));
+    font-weight: var(--font-weight, 700);
+    font-style: var(--font-italic, normal);
+    line-height: 1.3; color: var(--text-color, #fff); margin-bottom: 8px;
+  }
+  .results-meta {
+    font-size: calc(clamp(11px, 1.4vw, 16px) * var(--text-scale, 1));
+    color: #666; display: flex; gap: 16px;
+  }
+  .results-meta span { color: #a5b4fc; }
+
+  .options-grid { display: grid; gap: clamp(8px, 1.2vw, 16px); }
+  .options-grid.layout-rows    { grid-template-columns: 1fr; }
+  .options-grid.layout-cols-1  { grid-template-columns: 1fr; }
+  .options-grid.layout-cols-2  { grid-template-columns: 1fr 1fr; }
+  .options-grid.layout-cols-3  { grid-template-columns: 1fr 1fr 1fr; }
+  .options-grid.layout-cols-4  { grid-template-columns: 1fr 1fr 1fr 1fr; }
+
+  .option-bar {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 14px;
+    padding: clamp(10px, 1.5vw, 18px) clamp(12px, 2vw, 24px);
+    position: relative; overflow: hidden;
+  }
+  .option-fill {
+    position: absolute; top: 0; left: 0; height: 100%;
+    background: linear-gradient(90deg, rgba(99,102,241,0.35), rgba(139,92,246,0.2));
+    border-radius: 14px;
+    transition: width 0.6s cubic-bezier(0.4,0,0.2,1);
+  }
+  .option-content {
+    position: relative; z-index: 1;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .option-rank {
+    font-size: calc(clamp(10px, 1.2vw, 14px) * var(--text-scale, 1));
+    color: #6366f1; font-weight: 700;
+    width: clamp(18px, 2vw, 26px); text-align: center; flex-shrink: 0;
+  }
+  .option-text-wrap { flex: 1; min-width: 0; }
+  .option-text-val {
+    font-size: calc(clamp(13px, 2vw, 22px) * var(--text-scale, 1));
+    font-weight: var(--font-weight, 600);
+    font-style: var(--font-italic, normal);
+    color: var(--text-color, #fff);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .option-value {
+    font-size: calc(clamp(16px, 2.5vw, 30px) * var(--text-scale, 1));
+    font-weight: 800; color: #a5b4fc;
+    white-space: nowrap; flex-shrink: 0;
+  }
+  .option-value.leading { color: #c4b5fd; }
+  .option-bar.leading .option-fill {
+    background: linear-gradient(90deg, rgba(124,58,237,0.5), rgba(99,102,241,0.3));
+  }
+  .option-bar.leading { border-color: rgba(124,58,237,0.4); }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: scale(0.97) translateY(8px); }
+    to   { opacity: 1; transform: scale(1)    translateY(0); }
+  }
+
+  .empty-scene { text-align: center; color: rgba(255,255,255,0.15); font-size: clamp(16px, 2.5vw, 28px); }
+
+  .live-dot {
+    display: inline-block; width: 8px; height: 8px;
+    border-radius: 50%; background: #f87171;
+    animation: pulse 1.4s infinite; margin-right: 6px;
+  }
+  @keyframes pulse {
+    0%,100% { opacity:1; transform:scale(1); }
+    50%      { opacity:.5; transform:scale(1.3); }
+  }
+</style>
+<!-- Dynamic background + font overrides injected here -->
+<style id="dynamic-style"></style>
+</head>
+<body>
+
+<div class="scene" id="scene">
+  <div class="empty-scene">Ожидание...</div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
+let currentState = null;
+
+socket.on('state_update', (s) => {
+  currentState = s;
+  applySettings(s);
+  render(s);
+});
+
+// ── Apply background + font CSS ─────────────────────────────
+function applySettings(s) {
+  const bg   = s.backgroundSettings || {};
+  const font = s.fontSettings       || {};
+
+  // Background
+  let bgCSS = '';
+  if (bg.type === 'color' && bg.color) {
+    bgCSS = `html,body { background: ${bg.color} !important; }`;
+  } else if (bg.type === 'image' && bg.imageUrl) {
+    bgCSS = `html,body { background: url('${bg.imageUrl}') center/cover no-repeat !important; }`;
+  } else {
+    // transparent — OBS chroma / alpha
+    bgCSS = `html,body { background: transparent !important; }`;
+  }
+
+  // Font family — preload Google fonts dynamically if needed
+  const family = font.family || "'Segoe UI', Arial, sans-serif";
+  loadGoogleFontIfNeeded(family);
+
+  // Scale (1.0 = 100%)
+  const scale   = font.sizeScale ?? 1.0;
+  const color   = font.color    || '#ffffff';
+  const weight  = font.bold     ? '700' : 'normal';
+  const italic  = font.italic   ? 'italic' : 'normal';
+
+  const fontCSS = `
+    :root {
+      --text-scale:  ${scale};
+      --text-color:  ${color};
+      --font-weight: ${weight};
+      --font-italic: ${italic};
+      --font-family: ${family};
+    }
+    body { font-family: ${family}; }
+  `;
+
+  document.getElementById('dynamic-style').textContent = bgCSS + fontCSS;
+}
+
+// Lazy-load Google Fonts only when needed
+const loadedFonts = new Set();
+function loadGoogleFontIfNeeded(family) {
+  const googleFonts = {
+    "'Roboto', sans-serif":        'Roboto:ital,wght@0,400;0,700;1,400;1,700',
+    "'Oswald', sans-serif":        'Oswald:wght@400;700',
+    "'Montserrat', sans-serif":    'Montserrat:ital,wght@0,400;0,700;1,400;1,700',
+    "'Inter', sans-serif":         'Inter:wght@400;700',
+    "'Bebas Neue', cursive":       'Bebas+Neue',
+  };
+  const spec = googleFonts[family];
+  if (!spec || loadedFonts.has(spec)) return;
+  loadedFonts.add(spec);
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = `https://fonts.googleapis.com/css2?family=${spec}&display=swap`;
+  document.head.appendChild(link);
+}
+
+// ── Render ──────────────────────────────────────────────────
+function getVoteUrl() {
+  const base = (currentState && currentState.baseUrl) ? currentState.baseUrl : window.location.origin;
+  return base + '/vote';
+}
+
+function render(s) {
+  const scene = document.getElementById('scene');
+  if (!s.currentQuestion) {
+    scene.innerHTML = '<div class="empty-scene">Вопрос не выбран</div>';
+    return;
+  }
+  const mode = s.broadcastMode;
+  if      (mode === 'qr')       renderQR(scene, s);
+  else if (mode === 'question') renderQuestion(scene, s);
+  else if (mode === 'both')     renderBoth(scene, s);
+  else if (mode === 'results')  renderResults(scene, s);
+}
+
+function renderQR(scene, s) {
+  const url  = getVoteUrl();
+  const size = Math.round(Math.min(window.innerWidth, window.innerHeight) * 0.35);
+  scene.innerHTML = `
+    <div class="qr-card">
+      <div class="qr-label">Отсканируйте QR-код для участия в голосовании</div>
+      <img id="qrCode" style="border-radius:12px; width:${size}px; height:${size}px;">
+      <div class="qr-url">${url}</div>
+    </div>`;
+  generateQR('qrCode', url, size);
+}
+
+function renderQuestion(scene, s) {
+  const q = s.currentQuestion;
+  scene.innerHTML = `
+    <div class="question-card">
+      <div class="question-label">Вопрос</div>
+      <div class="question-text">${escHtml(q.text)}</div>
+    </div>`;
+}
+
+function renderBoth(scene, s) {
+  const q      = s.currentQuestion;
+  const url    = getVoteUrl();
+  const qrSize = Math.round(Math.min(window.innerWidth * 0.22, window.innerHeight * 0.4, 200));
+  scene.innerHTML = `
+    <div class="both-card">
+      <div class="both-qr">
+        <img id="qrCode" style="border-radius:12px; width:${qrSize}px; height:${qrSize}px;">
+        <div class="qr-url">${url}</div>
+      </div>
+      <div class="both-question">
+        <div class="question-label">Вопрос</div>
+        <div class="question-text">${escHtml(q.text)}</div>
+      </div>
+    </div>`;
+  generateQR('qrCode', url, qrSize);
+}
+
+// Tracks the last full-render key to avoid unnecessary redraws
+let lastResultsKey = '';
+
+function resultsKey(q, ds) {
+  return `${q.id}|${ds.layout}|${ds.columns}|${ds.showMode}|${ds.showAnswered}|${q.options.length}`;
+}
+
+function renderResults(scene, s) {
+  const q   = s.currentQuestion;
+  const ds  = s.displaySettings || {};
+  const key = resultsKey(q, ds);
+
+  const totalVotes = q.options.reduce((sum, o) => sum + o.votes, 0);
+  const maxVotes   = Math.max(...q.options.map(o => o.votes), 1);
+  const sorted     = [...q.options].sort((a, b) => b.votes - a.votes);
+
+  // If structure unchanged — update in-place (no flicker)
+  if (key === lastResultsKey && scene.querySelector('.results-card')) {
+    updateResultsInPlace(scene, q, ds, totalVotes, maxVotes, sorted);
+    return;
+  }
+  lastResultsKey = key;
+
+  // Full render (structure changed or first render)
+  const layoutClass = ds.layout === 'columns'
+    ? `layout-cols-${Math.min(ds.columns || 2, 4)}`
+    : 'layout-rows';
+
+  const optionsHtml = q.options.map(opt => {
+    const pct       = totalVotes > 0 ? Math.round((opt.votes / totalVotes) * 100) : 0;
+    const fillPct   = totalVotes > 0 ? (opt.votes / maxVotes) * 100 : 0;
+    const isLeading = opt.votes === maxVotes && opt.votes > 0;
+    const rank      = sorted.findIndex(o => o.id === opt.id) + 1;
+    return `
+      <div class="option-bar ${isLeading ? 'leading' : ''}" data-id="${opt.id}">
+        <div class="option-fill" style="width:${fillPct}%"></div>
+        <div class="option-content">
+          <div class="option-rank">#${rank}</div>
+          <div class="option-text-wrap">
+            <div class="option-text-val">${escHtml(opt.text)}</div>
+          </div>
+          <div class="option-value ${isLeading ? 'leading' : ''}">${valueHtml(opt.votes, pct, ds.showMode)}</div>
+        </div>
+      </div>`;
+  }).join('');
+
+  const metaHtml = ds.showAnswered !== false
+    ? `<div style="display:flex;align-items:center;gap:4px;"><span class="live-dot"></span>Проголосовало: <span class="total-count">${totalVotes}</span></div>`
+    : '';
+
+  scene.innerHTML = `
+    <div class="results-card">
+      <div class="results-header">
+        <div class="results-question">${escHtml(q.text)}</div>
+        <div class="results-meta">${metaHtml}</div>
+      </div>
+      <div class="options-grid ${layoutClass}">${optionsHtml}</div>
+    </div>`;
+  requestAnimationFrame(autoFit);
+}
+
+function valueHtml(votes, pct, showMode) {
+  if (showMode === 'count') return `${votes}`;
+  if (showMode === 'both')  return `${pct}%&thinsp;<span style="font-size:.6em;color:#888">(${votes})</span>`;
+  return `${pct}%`;
+}
+
+function updateResultsInPlace(scene, q, ds, totalVotes, maxVotes, sorted) {
+  // Total count
+  const countEl = scene.querySelector('.total-count');
+  if (countEl) countEl.textContent = totalVotes;
+
+  // Each option bar
+  q.options.forEach(opt => {
+    const bar = scene.querySelector(`.option-bar[data-id="${opt.id}"]`);
+    if (!bar) return;
+
+    const pct       = totalVotes > 0 ? Math.round((opt.votes / totalVotes) * 100) : 0;
+    const fillPct   = totalVotes > 0 ? (opt.votes / maxVotes) * 100 : 0;
+    const isLeading = opt.votes === maxVotes && opt.votes > 0;
+    const rank      = sorted.findIndex(o => o.id === opt.id) + 1;
+
+    // Smooth bar width (CSS transition handles animation)
+    const fill = bar.querySelector('.option-fill');
+    if (fill) fill.style.width = fillPct + '%';
+
+    // Rank
+    const rankEl = bar.querySelector('.option-rank');
+    if (rankEl) rankEl.textContent = '#' + rank;
+
+    // Value
+    const valEl = bar.querySelector('.option-value');
+    if (valEl) valEl.innerHTML = valueHtml(opt.votes, pct, ds.showMode);
+
+    // Leading highlight
+    bar.classList.toggle('leading', isLeading);
+    if (valEl) valEl.classList.toggle('leading', isLeading);
+  });
+}
+
+// Scale card to fit viewport if content overflows
+function autoFit() {
+  const scene = document.getElementById('scene');
+  const card  = scene.firstElementChild;
+  if (!card || card.classList.contains('empty-scene')) return;
+
+  card.style.zoom = '1';
+
+  requestAnimationFrame(() => {
+    const padH = scene.clientHeight * 0.08;
+    const padW = scene.clientWidth  * 0.08;
+    const availH = scene.clientHeight - padH;
+    const availW = scene.clientWidth  - padW;
+
+    const scaleH = card.scrollHeight > availH ? availH / card.scrollHeight : 1;
+    const scaleW = card.scrollWidth  > availW ? availW / card.scrollWidth  : 1;
+    const scale  = Math.min(scaleH, scaleW, 1);
+    card.style.zoom = scale.toFixed(5);
+  });
+}
+
+window.addEventListener('resize', () => { if (currentState) render(currentState); });
+
+function generateQR(imgId, url, size) {
+  const img = document.getElementById(imgId);
+  if (!img) return;
+  img.src = `/api/qr?url=${encodeURIComponent(url)}&size=${size}`;
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+</body>
+</html>

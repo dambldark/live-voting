@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Инструкция — Live Voting</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', sans-serif; background: #0f1117; color: #e0e0e0; line-height: 1.6; }
+
+  .topbar {
+    background: #1a1d2e; border-bottom: 1px solid #2a2d3e;
+    padding: 14px 32px; display: flex; align-items: center; gap: 16px;
+    position: sticky; top: 0; z-index: 10;
+  }
+  .topbar h1 { font-size: 17px; color: #fff; font-weight: 600; }
+  .topbar a {
+    margin-left: auto; color: #6366f1; text-decoration: none;
+    font-size: 13px; padding: 6px 14px; border: 1px solid #333;
+    border-radius: 8px; transition: background 0.15s;
+  }
+  .topbar a:hover { background: #1e2130; }
+
+  .page { max-width: 860px; margin: 0 auto; padding: 48px 32px 80px; }
+
+  .hero { text-align: center; margin-bottom: 56px; }
+  .hero .icon { font-size: 56px; margin-bottom: 16px; }
+  .hero h2 { font-size: 32px; font-weight: 700; color: #fff; margin-bottom: 10px; }
+  .hero p { font-size: 16px; color: #666; max-width: 520px; margin: 0 auto; }
+
+  /* Quick links */
+  .quick-links { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 56px; }
+  .ql-card {
+    background: #1a1d2e; border: 1px solid #2a2d3e; border-radius: 14px;
+    padding: 20px 18px; text-align: center; text-decoration: none;
+    transition: border-color 0.15s, background 0.15s; cursor: pointer;
+  }
+  .ql-card:hover { border-color: #6366f1; background: #1e2244; }
+  .ql-card .ql-icon { font-size: 28px; margin-bottom: 8px; }
+  .ql-card .ql-title { font-size: 14px; font-weight: 600; color: #e0e0e0; margin-bottom: 4px; }
+  .ql-card .ql-sub { font-size: 12px; color: #555; }
+
+  /* Sections */
+  .section { margin-bottom: 52px; scroll-margin-top: 80px; }
+  .section-head {
+    display: flex; align-items: center; gap: 14px;
+    margin-bottom: 24px; padding-bottom: 14px;
+    border-bottom: 1px solid #2a2d3e;
+  }
+  .section-num {
+    width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+    background: #6366f1; color: #fff; font-size: 16px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .section-head h3 { font-size: 20px; font-weight: 700; color: #fff; }
+  .section-head .sh-icon { font-size: 22px; }
+
+  /* Steps */
+  .steps { display: flex; flex-direction: column; gap: 14px; }
+  .step {
+    background: #1a1d2e; border: 1px solid #2a2d3e; border-radius: 12px;
+    padding: 16px 20px; display: flex; gap: 16px; align-items: flex-start;
+  }
+  .step-num {
+    width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
+    background: #312e6b; color: #a5b4fc; font-size: 12px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; margin-top: 1px;
+  }
+  .step-body {}
+  .step-title { font-size: 14px; font-weight: 600; color: #e0e0e0; margin-bottom: 4px; }
+  .step-desc { font-size: 13px; color: #777; line-height: 1.5; }
+
+  /* Tip / Note */
+  .tip {
+    background: #1a2540; border: 1px solid #1e3a5f; border-radius: 10px;
+    padding: 14px 18px; font-size: 13px; color: #7dd3fc; margin-top: 14px;
+    display: flex; gap: 10px; align-items: flex-start;
+  }
+  .tip-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+
+  .warn {
+    background: #2a1f0e; border: 1px solid #78350f; border-radius: 10px;
+    padding: 14px 18px; font-size: 13px; color: #fbbf24; margin-top: 14px;
+    display: flex; gap: 10px; align-items: flex-start;
+  }
+
+  /* Modes table */
+  .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 4px; }
+  .mode-card {
+    background: #1a1d2e; border: 1px solid #2a2d3e; border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .mode-card .mc-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .mode-card .mc-icon { font-size: 20px; }
+  .mode-card .mc-name { font-size: 13px; font-weight: 600; color: #e0e0e0; }
+  .mode-card .mc-desc { font-size: 12px; color: #666; line-height: 1.5; }
+
+  /* Settings rows */
+  .settings-list { display: flex; flex-direction: column; gap: 10px; }
+  .sl-row {
+    background: #1a1d2e; border: 1px solid #2a2d3e; border-radius: 10px;
+    padding: 12px 16px; display: flex; gap: 12px;
+  }
+  .sl-label { font-size: 13px; font-weight: 600; color: #a5b4fc; min-width: 130px; flex-shrink: 0; }
+  .sl-desc { font-size: 13px; color: #777; }
+
+  /* Flow diagram */
+  .flow { display: flex; align-items: center; gap: 0; flex-wrap: wrap; margin: 16px 0; }
+  .flow-step {
+    background: #1a1d2e; border: 1px solid #2a2d3e; border-radius: 10px;
+    padding: 10px 16px; font-size: 13px; color: #e0e0e0; text-align: center;
+  }
+  .flow-arrow { color: #444; font-size: 20px; padding: 0 8px; }
+
+  kbd {
+    background: #2a2d3e; border: 1px solid #444; border-radius: 4px;
+    padding: 2px 7px; font-size: 12px; font-family: monospace; color: #e0e0e0;
+  }
+
+  h4 { font-size: 14px; color: #aaa; font-weight: 600; margin: 16px 0 8px; }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <span style="font-size:20px;">📖</span>
+  <h1>Инструкция по использованию</h1>
+  <a href="/admin.html">← Вернуться в управление</a>
+</div>
+
+<div class="page">
+
+  <div class="hero">
+    <div class="icon">🗳️</div>
+    <h2>Live Voting</h2>
+    <p>Интерактивные голосования в прямом эфире. Участники голосуют со своих телефонов, результаты обновляются мгновенно на экране.</p>
+  </div>
+
+  <!-- Quick nav -->
+  <div class="quick-links">
+    <a class="ql-card" href="#section-start">
+      <div class="ql-icon">🚀</div>
+      <div class="ql-title">Быстрый старт</div>
+      <div class="ql-sub">За 5 минут к первому голосованию</div>
+    </a>
+    <a class="ql-card" href="#section-questions">
+      <div class="ql-icon">❓</div>
+      <div class="ql-title">Вопросы и варианты</div>
+      <div class="ql-sub">Создание и настройка</div>
+    </a>
+    <a class="ql-card" href="#section-broadcast">
+      <div class="ql-icon">📺</div>
+      <div class="ql-title">Страница эфира</div>
+      <div class="ql-sub">OBS и настройки отображения</div>
+    </a>
+    <a class="ql-card" href="#section-voting">
+      <div class="ql-icon">📱</div>
+      <div class="ql-title">Голосование</div>
+      <div class="ql-sub">Как участники голосуют</div>
+    </a>
+    <a class="ql-card" href="#section-address">
+      <div class="ql-icon">🌐</div>
+      <div class="ql-title">Настройка адреса</div>
+      <div class="ql-sub">Локальная сеть и внешний доступ</div>
+    </a>
+    <a class="ql-card" href="#section-tips">
+      <div class="ql-icon">💡</div>
+      <div class="ql-title">Советы и сценарии</div>
+      <div class="ql-sub">Типичные схемы использования</div>
+    </a>
+  </div>
+
+  <!-- 1. Быстрый старт -->
+  <div class="section" id="section-start">
+    <div class="section-head">
+      <div class="section-num">1</div>
+      <span class="sh-icon">🚀</span>
+      <h3>Быстрый старт</h3>
+    </div>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">Запустите сервер</div>
+          <div class="step-desc">Дважды кликните <kbd>start.bat</kbd> в папке с программой. Откроется окно командной строки — не закрывайте его пока работаете.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">Откройте страницу управления</div>
+          <div class="step-desc">Перейдите по адресу <kbd>http://localhost:8080/admin.html</kbd> в браузере на вашем компьютере.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">Создайте вопрос</div>
+          <div class="step-desc">Нажмите <kbd>+ Добавить вопрос</kbd>, введите текст вопроса и выберите тип: один вариант или несколько. Добавьте варианты ответов.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <div class="step-title">Активируйте вопрос</div>
+          <div class="step-desc">Нажмите кнопку <kbd>Выбрать</kbd> на карточке вопроса — он станет текущим и появится на странице эфира.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-body">
+          <div class="step-title">Откройте голосование</div>
+          <div class="step-desc">Нажмите зелёную кнопку <kbd>▶ Открыть</kbd> — участники смогут голосовать. Закройте кнопкой <kbd>⏹ Закрыть</kbd> когда нужно.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">6</div>
+        <div class="step-body">
+          <div class="step-title">Покажите QR-код в эфире</div>
+          <div class="step-desc">Добавьте <kbd>broadcast.html</kbd> как Browser Source в OBS или откройте в отдельном окне для демонстрации.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tip">
+      <span class="tip-icon">💡</span>
+      Весь процесс управления — открыть/закрыть голосование, переключить режим отображения — делается в реальном времени без перезагрузки страниц.
+    </div>
+  </div>
+
+  <!-- 2. Вопросы -->
+  <div class="section" id="section-questions">
+    <div class="section-head">
+      <div class="section-num">2</div>
+      <span class="sh-icon">❓</span>
+      <h3>Вопросы и варианты ответов</h3>
+    </div>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">+</div>
+        <div class="step-body">
+          <div class="step-title">Добавление вопроса</div>
+          <div class="step-desc">Нажмите <kbd>+ Добавить вопрос</kbd> в левой панели. Введите текст и выберите тип: <strong>Один</strong> — участник выбирает один вариант; <strong>Несколько</strong> — можно отметить несколько.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">✏</div>
+        <div class="step-body">
+          <div class="step-title">Редактирование</div>
+          <div class="step-desc">Кликните по карточке вопроса в списке — откроется редактор в центральной панели. Текст вопроса и варианты ответов сохраняются автоматически при потере фокуса.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">🔄</div>
+        <div class="step-body">
+          <div class="step-title">Сброс голосов</div>
+          <div class="step-desc">Кнопка <kbd>🔄 Сбросить</kbd> в верхней панели редактора обнуляет все голоса выбранного вопроса. Удобно для повторного проведения голосования.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="warn">
+      <span>⚠️</span>
+      Удаление вопроса необратимо — все голоса по нему тоже удаляются. Если вопрос был активным, голосование закрывается автоматически.
+    </div>
+  </div>
+
+  <!-- 3. Эфир -->
+  <div class="section" id="section-broadcast">
+    <div class="section-head">
+      <div class="section-num">3</div>
+      <span class="sh-icon">📺</span>
+      <h3>Страница эфира</h3>
+    </div>
+
+    <p style="font-size:14px; color:#777; margin-bottom:16px;">
+      Адрес: <kbd>http://localhost:8080/broadcast.html</kbd> — добавляется в OBS как Browser Source или открывается в отдельном окне.
+    </p>
+
+    <h4>Режимы отображения</h4>
+    <div class="modes">
+      <div class="mode-card">
+        <div class="mc-head"><span class="mc-icon">📱</span><span class="mc-name">QR-код</span></div>
+        <div class="mc-desc">Только QR-код со ссылкой на голосование. Показывайте когда хотите чтобы аудитория сканировала и переходила.</div>
+      </div>
+      <div class="mode-card">
+        <div class="mc-head"><span class="mc-icon">❓</span><span class="mc-name">Вопрос</span></div>
+        <div class="mc-desc">Только текст вопроса крупным шрифтом. Удобно для озвучки перед открытием голосования.</div>
+      </div>
+      <div class="mode-card">
+        <div class="mc-head"><span class="mc-icon">📋</span><span class="mc-name">QR + Вопрос</span></div>
+        <div class="mc-desc">QR-код и текст вопроса вместе. Оптимальный режим во время активного голосования.</div>
+      </div>
+      <div class="mode-card">
+        <div class="mc-head"><span class="mc-icon">📊</span><span class="mc-name">Результаты</span></div>
+        <div class="mc-desc">Полосы с результатами, обновляются в реальном времени. Переключайте сюда после закрытия голосования.</div>
+      </div>
+    </div>
+
+    <h4>Настройки результатов</h4>
+    <div class="settings-list">
+      <div class="sl-row">
+        <span class="sl-label">Показывать</span>
+        <span class="sl-desc"><strong>Кол-во</strong> — абсолютное число голосов. <strong>%</strong> — процентное соотношение. <strong>Оба</strong> — процент и число в скобках.</span>
+      </div>
+      <div class="sl-row">
+        <span class="sl-label">Расположение</span>
+        <span class="sl-desc"><strong>Строки</strong> — варианты друг под другом. <strong>Колонки</strong> — в несколько колонок. Количество колонок задаётся отдельно (1–4).</span>
+      </div>
+      <div class="sl-row">
+        <span class="sl-label">Кол-во голосов</span>
+        <span class="sl-desc">Показывать или скрывать счётчик "Проголосовало: N" в результатах.</span>
+      </div>
+    </div>
+
+    <h4>Фон страницы эфира</h4>
+    <div class="settings-list">
+      <div class="sl-row">
+        <span class="sl-label">Прозрачный</span>
+        <span class="sl-desc">Фон отсутствует (альфа-канал). В OBS Browser Source включите <strong>Allow transparency</strong> — и контент будет накладываться поверх других сцен.</span>
+      </div>
+      <div class="sl-row">
+        <span class="sl-label">Цвет</span>
+        <span class="sl-desc">Однотонный цвет фона. Выберите через пикер. Удобно когда нужен хромакей (зелёный/синий фон).</span>
+      </div>
+      <div class="sl-row">
+        <span class="sl-label">Картинка</span>
+        <span class="sl-desc">Загрузите изображение (JPG/PNG до 20 МБ) — оно будет использоваться как фон, растянутый на весь экран.</span>
+      </div>
+    </div>
+
+    <h4>Шрифт</h4>
+    <div class="settings-list">
+      <div class="sl-row">
+        <span class="sl-label">Гарнитура</span>
+        <span class="sl-desc">Системные шрифты работают всегда. Google Fonts (Roboto, Oswald, Montserrat и др.) загружаются из интернета — нужно подключение.</span>
+      </div>
+      <div class="sl-row">
+        <span class="sl-label">Масштаб</span>
+        <span class="sl-desc">50–200%. Масштабирует все тексты пропорционально. По умолчанию 100% — размер адаптируется под разрешение окна.</span>
+      </div>
+      <div class="sl-row">
+        <span class="sl-label">Цвет текста</span>
+        <span class="sl-desc">Применяется к вопросу и вариантам ответов. Акцентные цвета (фиолетовые значения, нумерация) остаются фиксированными.</span>
+      </div>
+    </div>
+
+    <div class="tip">
+      <span class="tip-icon">💡</span>
+      Страница эфира автоматически масштабирует результаты чтобы все варианты помещались в окно, и реагирует на изменение размера — можно задавать любое разрешение в OBS.
+    </div>
+  </div>
+
+  <!-- 4. Голосование -->
+  <div class="section" id="section-voting">
+    <div class="section-head">
+      <div class="section-num">4</div>
+      <span class="sh-icon">📱</span>
+      <h3>Страница голосования для участников</h3>
+    </div>
+
+    <p style="font-size:14px; color:#777; margin-bottom:16px;">
+      Участники сканируют QR-код или переходят по ссылке и попадают на <kbd>/vote</kbd>. Страница адаптирована для мобильных устройств.
+    </p>
+
+    <div class="flow">
+      <div class="flow-step">Сканирует QR</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">Выбирает ответ</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">Нажимает «Проголосовать»</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">«Голос принят»</div>
+    </div>
+
+    <div class="settings-list" style="margin-top:16px;">
+      <div class="sl-row">
+        <span class="sl-label">Защита от повтора</span>
+        <span class="sl-desc">Каждый участник может проголосовать один раз (хранится в localStorage устройства). Очищается при очистке браузера.</span>
+      </div>
+      <div class="sl-row">
+        <span class="sl-label">Переголосовать</span>
+        <span class="sl-desc">После голосования доступна кнопка <strong>↩ Переголосовать</strong> — один раз сменить ответ. После второго голоса кнопка исчезает навсегда для этого вопроса.</span>
+      </div>
+      <div class="sl-row">
+        <span class="sl-label">Голосование закрыто</span>
+        <span class="sl-desc">Если организатор закрыл голосование — участники видят соответствующий экран и не могут отправить ответ. Кнопка переголосования тоже скрывается.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. Адрес -->
+  <div class="section" id="section-address">
+    <div class="section-head">
+      <div class="section-num">5</div>
+      <span class="sh-icon">🌐</span>
+      <h3>Настройка адреса для QR-кода</h3>
+    </div>
+
+    <p style="font-size:14px; color:#777; margin-bottom:16px;">
+      QR-код должен содержать адрес, доступный с телефонов участников. Настраивается в правой панели управления, раздел <strong>«Адрес для QR-кода»</strong>.
+    </p>
+
+    <div class="settings-list">
+      <div class="sl-row">
+        <span class="sl-label">localhost</span>
+        <span class="sl-desc">Работает только на том же компьютере где запущен сервер. Для тестирования.</span>
+      </div>
+      <div class="sl-row">
+        <span class="sl-label">192.168.x.x</span>
+        <span class="sl-desc">Локальный IP в вашей сети Wi-Fi. Участники должны быть подключены к той же сети что и ваш компьютер. Система определяет этот адрес автоматически.</span>
+      </div>
+      <div class="sl-row">
+        <span class="sl-label">Свой адрес</span>
+        <span class="sl-desc">Введите любой IP или домен — только сам адрес, без <kbd>http://</kbd> и порта. Например: <kbd>95.31.17.28</kbd> или <kbd>prz.mero.agency</kbd>. Протокол и порт добавятся автоматически.</span>
+      </div>
+    </div>
+
+    <div class="warn">
+      <span>⚠️</span>
+      При использовании внешнего IP убедитесь что порт 8080 открыт в брандмауэре Windows и на роутере настроен проброс порта на ваш компьютер.
+    </div>
+
+    <div class="tip">
+      <span class="tip-icon">💡</span>
+      Если у вас есть домен и nginx — можно настроить реверс-прокси на <kbd>https://ваш-домен/question/</kbd>. В этом случае введите в поле «Свой адрес» ваш домен и выбранный путь.
+    </div>
+  </div>
+
+  <!-- 6. Советы -->
+  <div class="section" id="section-tips">
+    <div class="section-head">
+      <div class="section-num">6</div>
+      <span class="sh-icon">💡</span>
+      <h3>Советы и типичные сценарии</h3>
+    </div>
+
+    <h4>Сценарий: голосование в прямом эфире (OBS)</h4>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">Добавьте Browser Source в OBS</div>
+          <div class="step-desc">URL: <kbd>http://localhost:8080/broadcast.html</kbd>. Ширина и высота — по размеру вашей сцены (например 1920×1080). Включите <strong>Allow transparency</strong>.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">Начните с режима «QR + Вопрос»</div>
+          <div class="step-desc">Переключите в управлении на режим <strong>QR + Вопрос</strong>, затем откройте голосование — зрители могут сканировать и голосовать.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">Покажите результаты</div>
+          <div class="step-desc">Закройте голосование кнопкой <kbd>⏹ Закрыть</kbd>, переключите режим на <strong>Результаты</strong> — шкалы появятся на экране.</div>
+        </div>
+      </div>
+    </div>
+
+    <h4>Сценарий: офлайн-мероприятие</h4>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">Создайте точку доступа Wi-Fi</div>
+          <div class="step-desc">Раздайте интернет с ноутбука или используйте роутер. Участники подключаются к этой сети.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">Выберите локальный IP</div>
+          <div class="step-desc">В разделе «Адрес для QR-кода» выберите адрес вида <kbd>192.168.x.x</kbd> — он определится автоматически в списке.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">Выведите QR на проектор</div>
+          <div class="step-desc">Откройте <kbd>broadcast.html</kbd> в полноэкранном режиме браузера на компьютере подключённом к проектору.</div>
+        </div>
+      </div>
+    </div>
+
+    <h4>Полезные советы</h4>
+    <div class="settings-list">
+      <div class="sl-row">
+        <span class="sl-label">Несколько вопросов</span>
+        <span class="sl-desc">Создайте все вопросы заранее. Переключайте активный вопрос кнопкой <strong>Выбрать</strong> — прошлые голоса сохраняются и вы можете вернуться к ним.</span>
+      </div>
+      <div class="sl-row">
+        <span class="sl-label">Сброс перед повтором</span>
+        <span class="sl-desc">Если нужно провести то же голосование заново — нажмите <strong>🔄 Сбросить</strong> чтобы обнулить голоса, затем снова откройте голосование.</span>
+      </div>
+      <div class="sl-row">
+        <span class="sl-label">Данные сохраняются</span>
+        <span class="sl-desc">Все вопросы и голоса хранятся в файле <kbd>data.json</kbd> рядом с программой. При перезапуске сервера данные сохраняются.</span>
+      </div>
+      <div class="sl-row">
+        <span class="sl-label">Несколько вкладок</span>
+        <span class="sl-desc">Страницу управления и страницу эфира можно открыть одновременно в разных вкладках или на разных мониторах — всё синхронизируется автоматически.</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// Smooth scroll for quick links
+document.querySelectorAll('a[href^="#"]').forEach(a => {
+  a.addEventListener('click', e => {
+    e.preventDefault();
+    const target = document.querySelector(a.getAttribute('href'));
+    if (target) target.scrollIntoView({ behavior: 'smooth' });
+  });
+});
+</script>
+
+</body>
+</html>

@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Управление голосованием</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', sans-serif; background: #0f1117; color: #e0e0e0; min-height: 100vh; }
+
+  .header {
+    background: #1a1d2e; padding: 14px 24px;
+    display: flex; align-items: center; gap: 16px;
+    border-bottom: 1px solid #2a2d3e;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .header h1 { font-size: 18px; color: #fff; font-weight: 600; }
+  .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #555; transition: background 0.3s; }
+  .status-dot.connected { background: #4ade80; box-shadow: 0 0 8px #4ade80; }
+
+  .layout { display: grid; grid-template-columns: 280px 1fr 300px; gap: 0; height: calc(100vh - 57px); overflow: hidden; }
+
+  .panel { padding: 20px; overflow-y: auto; border-right: 1px solid #2a2d3e; }
+  .panel:last-child { border-right: none; border-left: 1px solid #2a2d3e; }
+  .panel h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: #888; margin-bottom: 16px; }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 14px; border-radius: 8px; border: none; cursor: pointer;
+    font-size: 13px; font-weight: 500; transition: all 0.15s;
+  }
+  .btn-primary { background: #6366f1; color: #fff; }
+  .btn-primary:hover { background: #5558e8; }
+  .btn-success { background: #22c55e; color: #fff; }
+  .btn-success:hover { background: #16a34a; }
+  .btn-danger { background: #ef4444; color: #fff; }
+  .btn-danger:hover { background: #dc2626; }
+  .btn-ghost { background: transparent; color: #aaa; border: 1px solid #333; }
+  .btn-ghost:hover { background: #222; color: #fff; }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+  .btn-full { width: 100%; justify-content: center; }
+
+  input[type=text], textarea, select {
+    background: #1e2130; border: 1px solid #2a2d3e; color: #e0e0e0;
+    border-radius: 8px; padding: 8px 12px; font-size: 13px; outline: none;
+    transition: border-color 0.15s; font-family: inherit;
+  }
+  input[type=text]:focus, textarea:focus, select:focus { border-color: #6366f1; }
+  input[type=text] { width: 100%; }
+  textarea { width: 100%; resize: vertical; min-height: 60px; }
+  select { width: 100%; }
+
+  .question-item {
+    background: #1a1d2e; border: 1px solid #2a2d3e; border-radius: 10px;
+    padding: 12px; margin-bottom: 10px; cursor: pointer; transition: all 0.15s;
+  }
+  .question-item:hover { border-color: #6366f1; }
+  .question-item.active { border-color: #6366f1; background: #1e2244; }
+  .question-item .q-text { font-size: 13px; color: #e0e0e0; margin-bottom: 6px; line-height: 1.4; }
+  .question-item .q-meta { font-size: 11px; color: #666; display: flex; gap: 8px; align-items: center; }
+  .badge { padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 600; text-transform: uppercase; }
+  .badge-single { background: #312e6b; color: #a5b4fc; }
+  .badge-multi { background: #1e3a5f; color: #7dd3fc; }
+  .badge-active { background: #14532d; color: #4ade80; }
+  .q-actions { display: flex; gap: 4px; margin-top: 8px; }
+
+  .center-panel { padding: 24px; overflow-y: auto; }
+  .center-panel h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: #888; margin-bottom: 20px; }
+  .empty-state { text-align: center; padding: 60px 20px; color: #555; font-size: 14px; }
+
+  .question-editor { background: #1a1d2e; border-radius: 12px; padding: 20px; }
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-size: 12px; color: #888; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+  .type-toggle { display: flex; gap: 8px; }
+  .type-btn {
+    flex: 1; padding: 8px; border-radius: 8px; border: 1px solid #333; background: transparent;
+    color: #888; cursor: pointer; font-size: 12px; text-align: center; transition: all 0.15s;
+  }
+  .type-btn.active { background: #312e6b; border-color: #6366f1; color: #a5b4fc; }
+
+  .options-list { margin-top: 12px; }
+  .option-item {
+    display: flex; align-items: center; gap: 8px;
+    background: #0f1117; border: 1px solid #2a2d3e; border-radius: 8px;
+    padding: 8px 10px; margin-bottom: 8px;
+  }
+  .option-item input { flex: 1; background: transparent; border: none; padding: 0; }
+  .option-votes { font-size: 12px; color: #666; white-space: nowrap; }
+  .add-option-row { display: flex; gap: 8px; margin-top: 8px; }
+  .add-option-row input { flex: 1; }
+
+  .voting-control {
+    display: flex; align-items: center; gap: 12px;
+    background: #1a1d2e; border-radius: 12px; padding: 16px 20px; margin-bottom: 16px;
+  }
+  .voting-status { font-size: 13px; }
+  .voting-status strong { display: block; font-size: 15px; margin-bottom: 2px; }
+  .on { color: #4ade80; }
+  .off { color: #f87171; }
+
+  /* Right panel */
+  .broadcast-section { margin-bottom: 16px; }
+  .broadcast-section h3 { font-size: 11px; color: #555; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+
+  .mode-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+  .mode-card {
+    background: #1a1d2e; border: 1px solid #2a2d3e; border-radius: 10px;
+    padding: 12px 10px; text-align: center; cursor: pointer; transition: all 0.15s;
+  }
+  .mode-card:hover { border-color: #6366f1; }
+  .mode-card.active { border-color: #6366f1; background: #1e2244; }
+  .mode-card .icon { font-size: 22px; margin-bottom: 4px; }
+  .mode-card .label { font-size: 11px; color: #aaa; }
+  .mode-card.active .label { color: #a5b4fc; }
+
+  .setting-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; gap: 8px; }
+  .setting-row label { font-size: 12px; color: #888; white-space: nowrap; flex-shrink: 0; }
+
+  .toggle { display: flex; background: #0f1117; border-radius: 6px; padding: 2px; }
+  .toggle button {
+    flex: 1; padding: 5px 8px; border: none; border-radius: 5px; background: transparent;
+    color: #666; cursor: pointer; font-size: 11px; transition: all 0.15s; white-space: nowrap;
+  }
+  .toggle button.active { background: #6366f1; color: #fff; }
+
+  .columns-control { display: flex; align-items: center; gap: 6px; }
+  .columns-control input[type=number] {
+    width: 50px; background: #1e2130; border: 1px solid #2a2d3e;
+    color: #e0e0e0; border-radius: 6px; padding: 5px 6px; font-size: 12px; text-align: center;
+  }
+
+  .divider { height: 1px; background: #2a2d3e; margin: 14px 0; }
+
+  .link-preview {
+    background: #0f1117; border-radius: 8px; padding: 10px 12px;
+    font-size: 11px; color: #666; word-break: break-all; margin-top: 6px;
+  }
+  .link-preview a { color: #6366f1; text-decoration: none; }
+  .link-preview a:hover { text-decoration: underline; }
+
+  /* Background settings */
+  .bg-type-row { display: flex; gap: 6px; margin-bottom: 10px; }
+  .bg-btn {
+    flex: 1; padding: 7px 4px; border-radius: 8px; border: 1px solid #333; background: transparent;
+    color: #888; cursor: pointer; font-size: 11px; text-align: center; transition: all 0.15s;
+  }
+  .bg-btn.active { background: #312e6b; border-color: #6366f1; color: #a5b4fc; }
+
+  .color-input-wrap {
+    position: relative; width: 100%; height: 36px;
+    border-radius: 8px; overflow: hidden; cursor: pointer;
+    border: 1px solid #2a2d3e;
+  }
+  .color-input-wrap input[type=color] {
+    position: absolute; top: -4px; left: -4px;
+    width: calc(100% + 8px); height: calc(100% + 8px);
+    border: none; padding: 0; cursor: pointer;
+    background: none;
+  }
+
+  .upload-area {
+    background: #0f1117; border: 1px dashed #333; border-radius: 8px;
+    padding: 12px; text-align: center; cursor: pointer; transition: border-color 0.15s;
+  }
+  .upload-area:hover { border-color: #6366f1; }
+  .upload-area p { font-size: 11px; color: #666; margin-top: 4px; }
+
+  #bgImagePreview img { width: 100%; border-radius: 6px; margin-top: 6px; max-height: 80px; object-fit: cover; }
+
+  /* Font settings */
+  .font-family-select { width: 100%; background: #1e2130; border: 1px solid #2a2d3e; color: #e0e0e0; border-radius: 8px; padding: 7px 10px; font-size: 12px; outline: none; }
+  .font-family-select:focus { border-color: #6366f1; }
+
+  .scale-row { display: flex; align-items: center; gap: 8px; }
+  .scale-row input[type=range] {
+    flex: 1; accent-color: #6366f1; cursor: pointer;
+    height: 4px; background: #333; border-radius: 2px;
+  }
+  .scale-val { font-size: 12px; color: #a5b4fc; width: 38px; text-align: right; flex-shrink: 0; }
+
+  .fmt-btns { display: flex; gap: 6px; }
+  .fmt-btn {
+    width: 36px; height: 30px; border-radius: 7px; border: 1px solid #333;
+    background: transparent; color: #666; cursor: pointer; font-size: 14px;
+    display: flex; align-items: center; justify-content: center; transition: all 0.15s;
+  }
+  .fmt-btn.active { background: #312e6b; border-color: #6366f1; color: #a5b4fc; }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="status-dot" id="statusDot"></div>
+  <h1>🗳️ Управление голосованием</h1>
+  <div style="margin-left:auto; display:flex; gap:8px;">
+    <a href="/broadcast.html" target="_blank" class="btn btn-ghost btn-sm">📺 Эфир</a>
+    <a href="/vote" target="_blank" class="btn btn-ghost btn-sm">📱 Голосование</a>
+    <a href="/help.html" target="_blank" class="btn btn-ghost btn-sm">📖 Инструкция</a>
+  </div>
+</div>
+
+<div class="layout">
+  <!-- LEFT: Questions -->
+  <div class="panel" id="questionList">
+    <h2>Вопросы</h2>
+    <div id="questionsContainer"></div>
+    <div style="margin-top:12px;">
+      <button class="btn btn-primary btn-full" onclick="showAddQuestion()">+ Добавить вопрос</button>
+    </div>
+    <div id="addQuestionForm" style="display:none; margin-top:12px; background:#1a1d2e; border-radius:10px; padding:14px;">
+      <div class="field">
+        <label>Текст вопроса</label>
+        <textarea id="newQuestionText" placeholder="Введите вопрос..."></textarea>
+      </div>
+      <div class="field">
+        <label>Тип ответа</label>
+        <div class="type-toggle">
+          <div class="type-btn active" id="newTypeSingle" onclick="setNewType('single')">Один</div>
+          <div class="type-btn" id="newTypeMulti" onclick="setNewType('multiple')">Несколько</div>
+        </div>
+      </div>
+      <div style="display:flex; gap:8px; margin-top:8px;">
+        <button class="btn btn-primary" style="flex:1" onclick="addQuestion()">Добавить</button>
+        <button class="btn btn-ghost" onclick="hideAddQuestion()">Отмена</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CENTER: Editor -->
+  <div class="center-panel">
+    <div id="votingControl" style="display:none;">
+      <div class="voting-control">
+        <div class="voting-status">
+          <strong id="votingStatusText">—</strong>
+          <span id="votingStatusSub" style="color:#888; font-size:12px;"></span>
+        </div>
+        <div style="margin-left:auto; display:flex; gap:8px;">
+          <button class="btn btn-ghost btn-sm" onclick="resetVotes()">🔄 Сбросить</button>
+          <button class="btn btn-success" id="btnOpenVoting" onclick="toggleVoting(true)" style="display:none;">▶ Открыть</button>
+          <button class="btn btn-danger" id="btnCloseVoting" onclick="toggleVoting(false)" style="display:none;">⏹ Закрыть</button>
+        </div>
+      </div>
+    </div>
+    <div id="editorContainer">
+      <div class="empty-state">
+        <div style="font-size:48px; margin-bottom:12px;">🗳️</div>
+        <div>Выберите вопрос из списка<br>или создайте новый</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Broadcast settings -->
+  <div class="panel">
+    <h2>Настройки эфира</h2>
+
+    <!-- Mode -->
+    <div class="broadcast-section">
+      <h3>Что показывать</h3>
+      <div class="mode-grid">
+        <div class="mode-card" data-mode="qr" onclick="setBroadcastMode('qr')">
+          <div class="icon">📱</div><div class="label">QR-код</div>
+        </div>
+        <div class="mode-card" data-mode="question" onclick="setBroadcastMode('question')">
+          <div class="icon">❓</div><div class="label">Вопрос</div>
+        </div>
+        <div class="mode-card" data-mode="both" onclick="setBroadcastMode('both')">
+          <div class="icon">📋</div><div class="label">QR + Вопрос</div>
+        </div>
+        <div class="mode-card" data-mode="results" onclick="setBroadcastMode('results')">
+          <div class="icon">📊</div><div class="label">Результаты</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Display settings -->
+    <div class="broadcast-section">
+      <h3>Отображение результатов</h3>
+      <div class="setting-row">
+        <label>Показывать</label>
+        <div class="toggle">
+          <button id="showCount" onclick="setDisplaySetting('showMode','count')">Кол-во</button>
+          <button id="showPct" onclick="setDisplaySetting('showMode','percentage')">%</button>
+          <button id="showBoth" onclick="setDisplaySetting('showMode','both')">Оба</button>
+        </div>
+      </div>
+      <div class="setting-row">
+        <label>Расположение</label>
+        <div class="toggle">
+          <button id="layoutRows" onclick="setDisplaySetting('layout','rows')">Строки</button>
+          <button id="layoutCols" onclick="setDisplaySetting('layout','columns')">Колонки</button>
+        </div>
+      </div>
+      <div class="setting-row">
+        <label>Колонок</label>
+        <div class="columns-control">
+          <button class="btn btn-ghost btn-sm" onclick="changeColumns(-1)">−</button>
+          <input type="number" id="columnsInput" min="1" max="4" value="2" onchange="setDisplaySetting('columns', parseInt(this.value))">
+          <button class="btn btn-ghost btn-sm" onclick="changeColumns(1)">+</button>
+        </div>
+      </div>
+      <div class="setting-row">
+        <label>Кол-во голосов</label>
+        <div class="toggle">
+          <button id="showAnsweredOn" onclick="setDisplaySetting('showAnswered',true)">Да</button>
+          <button id="showAnsweredOff" onclick="setDisplaySetting('showAnswered',false)">Нет</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Background -->
+    <div class="broadcast-section">
+      <h3>Фон страницы эфира</h3>
+      <div class="bg-type-row">
+        <div class="bg-btn active" id="bgBtnTransparent" onclick="setBgType('transparent')">Прозрачный</div>
+        <div class="bg-btn" id="bgBtnColor" onclick="setBgType('color')">Цвет</div>
+        <div class="bg-btn" id="bgBtnImage" onclick="setBgType('image')">Картинка</div>
+      </div>
+      <div id="bgColorWrap" style="display:none;">
+        <div class="color-input-wrap">
+          <input type="color" id="bgColorInput" value="#1a1d2e" oninput="setBackgroundSetting('color', this.value)">
+        </div>
+      </div>
+      <div id="bgImageWrap" style="display:none;">
+        <input type="file" id="bgImageInput" accept="image/*" style="display:none" onchange="uploadBgImage(this)">
+        <div class="upload-area" onclick="document.getElementById('bgImageInput').click()">
+          <div style="font-size:24px;">🖼️</div>
+          <p>Нажмите для выбора изображения</p>
+        </div>
+        <div id="bgImagePreview"></div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Font settings -->
+    <div class="broadcast-section">
+      <h3>Шрифт</h3>
+      <div style="margin-bottom:10px;">
+        <select class="font-family-select" id="fontFamilySelect" onchange="setFontSetting('family', this.value)">
+          <option value="'Segoe UI', Arial, sans-serif">Segoe UI (System)</option>
+          <option value="Arial, sans-serif">Arial</option>
+          <option value="'Helvetica Neue', Arial, sans-serif">Helvetica Neue</option>
+          <option value="Georgia, serif">Georgia</option>
+          <option value="'Times New Roman', serif">Times New Roman</option>
+          <option value="Impact, Arial, sans-serif">Impact</option>
+          <option value="'Courier New', monospace">Courier New</option>
+          <option value="'Roboto', sans-serif">Roboto</option>
+          <option value="'Oswald', sans-serif">Oswald</option>
+          <option value="'Montserrat', sans-serif">Montserrat</option>
+          <option value="'Inter', sans-serif">Inter</option>
+          <option value="'Bebas Neue', cursive">Bebas Neue</option>
+        </select>
+      </div>
+      <div class="setting-row">
+        <label>Масштаб</label>
+        <div class="scale-row" style="flex:1; margin-left:8px;">
+          <input type="range" id="fontScaleRange" min="50" max="200" value="100" step="5"
+            oninput="onFontScaleChange(this.value)">
+          <span class="scale-val" id="fontScaleVal">100%</span>
+        </div>
+      </div>
+      <div class="setting-row">
+        <label>Цвет текста</label>
+        <div class="color-input-wrap" style="width:80px; height:30px;">
+          <input type="color" id="fontColorInput" value="#ffffff" oninput="setFontSetting('color', this.value)">
+        </div>
+      </div>
+      <div class="setting-row">
+        <label>Стиль</label>
+        <div class="fmt-btns">
+          <button class="fmt-btn" id="fmtBold" onclick="toggleFontProp('bold')" title="Жирный" style="font-weight:700;">B</button>
+          <button class="fmt-btn" id="fmtItalic" onclick="toggleFontProp('italic')" title="Курсив" style="font-style:italic;">I</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Links & IP selector -->
+    <div class="broadcast-section">
+      <h3>Адрес для QR-кода</h3>
+      <select id="baseUrlSelect" class="font-family-select" onchange="onBaseUrlSelectChange(this.value)" style="margin-bottom:8px;">
+        <option value="">Загрузка адресов...</option>
+      </select>
+      <div id="customUrlWrap" style="display:none; margin-bottom:8px;">
+        <input type="text" id="customUrlInput" placeholder="192.168.1.100"
+          onblur="applyCustomUrl()" onkeydown="if(event.key==='Enter') applyCustomUrl()">
+        <div style="font-size:11px; color:#555; margin-top:4px;">Только IP или домен — протокол и порт добавятся автоматически</div>
+      </div>
+      <div class="link-preview">
+        <div style="color:#666; margin-bottom:4px;">Голосование:</div>
+        <a id="voteLink" href="/vote" target="_blank">/vote</a>
+      </div>
+      <div class="link-preview" style="margin-top:6px;">
+        <div style="color:#666; margin-bottom:4px;">Эфир (OBS):</div>
+        <a id="broadcastLink" href="/broadcast.html" target="_blank">/broadcast.html</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
+let state = {
+  questions: [], currentQuestionId: null, broadcastMode: 'qr',
+  displaySettings: {}, votingOpen: false,
+  backgroundSettings: { type: 'transparent', color: '#1a1d2e', imageUrl: null },
+  fontSettings: { family: "'Segoe UI', Arial, sans-serif", sizeScale: 1.0, color: '#ffffff', bold: false, italic: false }
+};
+let questions = [];
+let selectedQuestionId = null;
+let newQuestionType = 'single';
+
+socket.on('connect', () => document.getElementById('statusDot').classList.add('connected'));
+socket.on('disconnect', () => document.getElementById('statusDot').classList.remove('connected'));
+
+socket.emit('admin_get_state');
+
+socket.on('admin_state', (s) => {
+  state = s;
+  updateAllUI();
+});
+
+socket.on('questions_update', (q) => {
+  questions = q;
+  renderQuestionList();
+  if (selectedQuestionId) renderEditor(selectedQuestionId);
+  updateVotingControl();
+});
+
+socket.on('state_update', (s) => {
+  state.broadcastMode = s.broadcastMode;
+  state.displaySettings = s.displaySettings;
+  state.votingOpen = s.votingOpen;
+  state.currentQuestionId = s.currentQuestion?.id || null;
+  state.backgroundSettings = s.backgroundSettings;
+  state.fontSettings = s.fontSettings;
+  updateAllUI();
+});
+
+function updateAllUI() {
+  updateBroadcastModeUI();
+  updateDisplaySettingsUI();
+  updateBgUI();
+  updateFontUI();
+  updateVotingControl();
+  updateLinks();
+}
+
+// ── Questions ──────────────────────────────────────────────
+function renderQuestionList() {
+  const c = document.getElementById('questionsContainer');
+  if (!questions.length) {
+    c.innerHTML = '<div style="color:#555;font-size:13px;text-align:center;padding:20px 0;">Нет вопросов</div>';
+    return;
+  }
+  c.innerHTML = questions.map(q => `
+    <div class="question-item ${q.id === state.currentQuestionId ? 'active' : ''}" onclick="selectQuestion('${q.id}')">
+      <div class="q-text">${escHtml(q.text)}</div>
+      <div class="q-meta">
+        <span class="badge ${q.type === 'single' ? 'badge-single' : 'badge-multi'}">${q.type === 'single' ? 'Один' : 'Несколько'}</span>
+        <span>${q.options.length} вар.</span>
+        <span>${totalVotes(q)} гол.</span>
+        ${q.id === state.currentQuestionId ? '<span class="badge badge-active">Активен</span>' : ''}
+      </div>
+      <div class="q-actions">
+        <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation(); setCurrentQuestion('${q.id}')">
+          ${q.id === state.currentQuestionId ? '✓ Выбран' : 'Выбрать'}
+        </button>
+        ${q.id === state.currentQuestionId ? `
+        <button class="btn ${state.votingOpen ? 'btn-danger' : 'btn-success'} btn-sm"
+          onclick="event.stopPropagation(); toggleVoting(${!state.votingOpen})">
+          ${state.votingOpen ? '⏹ Закрыть' : '▶ Открыть'}
+        </button>` : ''}
+        <button class="btn btn-danger btn-sm" onclick="event.stopPropagation(); deleteQuestion('${q.id}')">✕</button>
+      </div>
+    </div>`).join('');
+}
+
+function totalVotes(q) { return q.options.reduce((s, o) => s + o.votes, 0); }
+
+function selectQuestion(id) { selectedQuestionId = id; renderEditor(id); }
+
+function renderEditor(id) {
+  const q = questions.find(q => q.id === id);
+  if (!q) return;
+  const isMulti = q.type === 'multiple';
+  document.getElementById('editorContainer').innerHTML = `
+    <div class="question-editor">
+      <div class="field">
+        <label>Текст вопроса</label>
+        <textarea id="editQText" onblur="saveQuestion('${q.id}')">${escHtml(q.text)}</textarea>
+      </div>
+      <div class="field">
+        <label>Тип ответа</label>
+        <div class="type-toggle">
+          <div class="type-btn ${!isMulti ? 'active' : ''}" onclick="setQuestionType('${q.id}','single')">Один вариант</div>
+          <div class="type-btn ${isMulti ? 'active' : ''}" onclick="setQuestionType('${q.id}','multiple')">Несколько вариантов</div>
+        </div>
+      </div>
+      <div class="field">
+        <label>Варианты ответов</label>
+        <div class="options-list">
+          ${q.options.map(o => `
+            <div class="option-item">
+              <input type="text" value="${escHtml(o.text)}" onblur="saveOption('${o.id}', this.value)">
+              <span class="option-votes">${o.votes} гол.</span>
+              <button class="btn btn-danger btn-sm" onclick="deleteOption('${q.id}','${o.id}')">✕</button>
+            </div>`).join('')}
+        </div>
+        <div class="add-option-row">
+          <input type="text" id="newOptionText" placeholder="Новый вариант..." onkeydown="if(event.key==='Enter') addOption('${q.id}')">
+          <button class="btn btn-primary btn-sm" onclick="addOption('${q.id}')">+</button>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('votingControl').style.display = 'block';
+  updateVotingControl();
+}
+
+function updateVotingControl() {
+  const vc = document.getElementById('votingControl');
+  if (!selectedQuestionId) { vc.style.display = 'none'; return; }
+  const q = questions.find(q => q.id === selectedQuestionId);
+  if (!q) return;
+  const isCurrent = q.id === state.currentQuestionId;
+  const statusText = document.getElementById('votingStatusText');
+  const statusSub = document.getElementById('votingStatusSub');
+  const btnOpen = document.getElementById('btnOpenVoting');
+  const btnClose = document.getElementById('btnCloseVoting');
+  if (isCurrent) {
+    if (state.votingOpen) {
+      statusText.innerHTML = '<span class="on">● Голосование открыто</span>';
+      statusSub.textContent = `${totalVotes(q)} голосов получено`;
+      btnOpen.style.display = 'none'; btnClose.style.display = '';
+    } else {
+      statusText.innerHTML = '<span class="off">● Голосование закрыто</span>';
+      statusSub.textContent = `${totalVotes(q)} голосов получено`;
+      btnOpen.style.display = ''; btnClose.style.display = 'none';
+    }
+  } else {
+    statusText.textContent = 'Вопрос не выбран для эфира';
+    statusSub.textContent = 'Нажмите "Выбрать" чтобы активировать';
+    btnOpen.style.display = 'none'; btnClose.style.display = 'none';
+  }
+}
+
+function showAddQuestion() { document.getElementById('addQuestionForm').style.display = 'block'; document.getElementById('newQuestionText').focus(); }
+function hideAddQuestion() { document.getElementById('addQuestionForm').style.display = 'none'; document.getElementById('newQuestionText').value = ''; }
+function setNewType(t) {
+  newQuestionType = t;
+  document.getElementById('newTypeSingle').classList.toggle('active', t === 'single');
+  document.getElementById('newTypeMulti').classList.toggle('active', t === 'multiple');
+}
+function addQuestion() {
+  const text = document.getElementById('newQuestionText').value.trim();
+  if (!text) return;
+  socket.emit('add_question', { text, type: newQuestionType });
+  hideAddQuestion();
+}
+function setQuestionType(id, type) { socket.emit('update_question', { id, type }); }
+function saveQuestion(id) { const t = document.getElementById('editQText')?.value.trim(); if (t) socket.emit('update_question', { id, text: t }); }
+function deleteQuestion(id) {
+  if (!confirm('Удалить вопрос?')) return;
+  socket.emit('delete_question', id);
+  if (selectedQuestionId === id) {
+    selectedQuestionId = null;
+    document.getElementById('editorContainer').innerHTML = '<div class="empty-state"><div style="font-size:48px;margin-bottom:12px;">🗳️</div><div>Выберите вопрос из списка<br>или создайте новый</div></div>';
+    document.getElementById('votingControl').style.display = 'none';
+  }
+}
+function setCurrentQuestion(id) { socket.emit('set_current_question', id); state.currentQuestionId = id; selectQuestion(id); renderQuestionList(); }
+function toggleVoting(open) { socket.emit('set_voting_open', open); }
+function resetVotes() { if (!selectedQuestionId || !confirm('Сбросить все голоса?')) return; socket.emit('reset_votes', selectedQuestionId); }
+
+function addOption(qId) {
+  const input = document.getElementById('newOptionText');
+  const text = input?.value.trim(); if (!text) return;
+  socket.emit('add_option', { questionId: qId, text });
+  if (input) input.value = '';
+}
+function saveOption(id, text) { if (text.trim()) socket.emit('update_option', { id, text: text.trim() }); }
+function deleteOption(qId, oId) { socket.emit('delete_option', { questionId: qId, optionId: oId }); }
+
+// ── Broadcast mode ─────────────────────────────────────────
+function setBroadcastMode(mode) {
+  state.broadcastMode = mode;
+  socket.emit('set_broadcast_mode', mode);
+  updateBroadcastModeUI();
+}
+function updateBroadcastModeUI() {
+  document.querySelectorAll('.mode-card').forEach(c => c.classList.toggle('active', c.dataset.mode === state.broadcastMode));
+}
+
+// ── Display settings ───────────────────────────────────────
+function setDisplaySetting(key, value) {
+  state.displaySettings = { ...state.displaySettings, [key]: value };
+  socket.emit('update_display_settings', { [key]: value });
+  updateDisplaySettingsUI();
+}
+function changeColumns(delta) {
+  const input = document.getElementById('columnsInput');
+  let val = Math.max(1, Math.min(4, parseInt(input.value) + delta));
+  input.value = val; setDisplaySetting('columns', val);
+}
+function updateDisplaySettingsUI() {
+  const ds = state.displaySettings || {};
+  ['showCount','showPct','showBoth'].forEach(id => document.getElementById(id)?.classList.remove('active'));
+  if (ds.showMode === 'count') document.getElementById('showCount')?.classList.add('active');
+  else if (ds.showMode === 'both') document.getElementById('showBoth')?.classList.add('active');
+  else document.getElementById('showPct')?.classList.add('active');
+  ['layoutRows','layoutCols'].forEach(id => document.getElementById(id)?.classList.remove('active'));
+  if (ds.layout === 'columns') document.getElementById('layoutCols')?.classList.add('active');
+  else document.getElementById('layoutRows')?.classList.add('active');
+  const ci = document.getElementById('columnsInput'); if (ci && ds.columns) ci.value = ds.columns;
+  ['showAnsweredOn','showAnsweredOff'].forEach(id => document.getElementById(id)?.classList.remove('active'));
+  if (ds.showAnswered === false) document.getElementById('showAnsweredOff')?.classList.add('active');
+  else document.getElementById('showAnsweredOn')?.classList.add('active');
+}
+
+// ── Background ─────────────────────────────────────────────
+function setBgType(type) {
+  state.backgroundSettings = { ...state.backgroundSettings, type };
+  socket.emit('update_background_settings', { type });
+  updateBgUI();
+}
+function setBackgroundSetting(key, value) {
+  state.backgroundSettings = { ...state.backgroundSettings, [key]: value };
+  socket.emit('update_background_settings', { [key]: value });
+}
+async function uploadBgImage(input) {
+  const file = input.files[0]; if (!file) return;
+  const fd = new FormData(); fd.append('image', file);
+  try {
+    const res = await fetch('/api/upload', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (data.url) {
+      state.backgroundSettings.imageUrl = data.url;
+      socket.emit('update_background_settings', { imageUrl: data.url });
+      document.getElementById('bgImagePreview').innerHTML = `<img src="${data.url}">`;
+    }
+  } catch(e) { alert('Ошибка загрузки изображения'); }
+}
+function updateBgUI() {
+  const bg = state.backgroundSettings || {};
+  ['bgBtnTransparent','bgBtnColor','bgBtnImage'].forEach(id => document.getElementById(id)?.classList.remove('active'));
+  const typeMap = { transparent: 'bgBtnTransparent', color: 'bgBtnColor', image: 'bgBtnImage' };
+  document.getElementById(typeMap[bg.type] || 'bgBtnTransparent')?.classList.add('active');
+  const colorWrap = document.getElementById('bgColorWrap');
+  const imageWrap = document.getElementById('bgImageWrap');
+  if (colorWrap) colorWrap.style.display = bg.type === 'color' ? 'block' : 'none';
+  if (imageWrap) imageWrap.style.display = bg.type === 'image' ? 'block' : 'none';
+  const ci = document.getElementById('bgColorInput'); if (ci && bg.color) ci.value = bg.color;
+  if (bg.imageUrl) {
+    const prev = document.getElementById('bgImagePreview');
+    if (prev && !prev.innerHTML) prev.innerHTML = `<img src="${bg.imageUrl}">`;
+  }
+}
+
+// ── Font ───────────────────────────────────────────────────
+function setFontSetting(key, value) {
+  state.fontSettings = { ...state.fontSettings, [key]: value };
+  socket.emit('update_font_settings', { [key]: value });
+}
+function toggleFontProp(key) {
+  const val = !(state.fontSettings?.[key] ?? false);
+  state.fontSettings = { ...state.fontSettings, [key]: val };
+  socket.emit('update_font_settings', { [key]: val });
+  updateFontUI();
+}
+function onFontScaleChange(val) {
+  document.getElementById('fontScaleVal').textContent = val + '%';
+  setFontSetting('sizeScale', parseFloat(val) / 100);
+}
+function updateFontUI() {
+  const fs = state.fontSettings || {};
+  const ff = document.getElementById('fontFamilySelect');
+  if (ff && fs.family) {
+    // Try to match option value
+    const opt = Array.from(ff.options).find(o => o.value === fs.family);
+    if (opt) ff.value = fs.family;
+  }
+  const scaleRange = document.getElementById('fontScaleRange');
+  const scaleVal = document.getElementById('fontScaleVal');
+  if (scaleRange && fs.sizeScale !== undefined) {
+    const pct = Math.round(fs.sizeScale * 100);
+    scaleRange.value = pct;
+    if (scaleVal) scaleVal.textContent = pct + '%';
+  }
+  const fc = document.getElementById('fontColorInput');
+  if (fc && fs.color) fc.value = fs.color;
+  document.getElementById('fmtBold')?.classList.toggle('active', !!fs.bold);
+  document.getElementById('fmtItalic')?.classList.toggle('active', !!fs.italic);
+}
+
+// ── Links & IP selector ────────────────────────────────────
+let networkAddresses = [];
+
+async function loadNetworkInfo() {
+  try {
+    const res = await fetch('/api/network-info');
+    const data = await res.json();
+    networkAddresses = data.addresses;
+
+    const sel = document.getElementById('baseUrlSelect');
+    sel.innerHTML = '';
+    data.addresses.forEach(a => {
+      const opt = document.createElement('option');
+      opt.value = a.url;
+      // Show just the IP/hostname cleanly
+      const host = a.url.replace(/^https?:\/\//, '').replace(/:\d+$/, '');
+      opt.textContent = a.label.split('  ')[0] + '  —  ' + host;
+      sel.appendChild(opt);
+    });
+    const custom = document.createElement('option');
+    custom.value = '__custom__';
+    custom.textContent = 'Свой адрес...';
+    sel.appendChild(custom);
+
+    // Restore saved selection
+    if (state.baseUrl) {
+      const match = data.addresses.find(a => a.url === state.baseUrl);
+      if (match) {
+        sel.value = state.baseUrl;
+      } else {
+        sel.value = '__custom__';
+        document.getElementById('customUrlWrap').style.display = 'block';
+        // Show only the IP part in the input
+        const justIp = state.baseUrl.replace(/^https?:\/\//, '').replace(/:\d+$/, '');
+        document.getElementById('customUrlInput').value = justIp;
+      }
+    }
+    updateLinks();
+  } catch(e) { console.error('Network info error', e); }
+}
+
+function onBaseUrlSelectChange(val) {
+  if (val === '__custom__') {
+    document.getElementById('customUrlWrap').style.display = 'block';
+    document.getElementById('customUrlInput').focus();
+  } else {
+    document.getElementById('customUrlWrap').style.display = 'none';
+    socket.emit('set_base_url', val);
+    state.baseUrl = val;
+    updateLinks();
+  }
+}
+
+function applyCustomUrl() {
+  let val = document.getElementById('customUrlInput').value.trim();
+  if (!val) return;
+  // Strip any existing protocol/port, then reconstruct cleanly
+  val = val.replace(/^https?:\/\//i, '').replace(/:\d+$/, '').trim();
+  const port = window.location.port || '8080';
+  const full = `http://${val}:${port}`;
+  socket.emit('set_base_url', full);
+  state.baseUrl = full;
+  updateLinks();
+}
+
+function updateLinks() {
+  const base = state.baseUrl || window.location.origin;
+  const vl = document.getElementById('voteLink');
+  const bl = document.getElementById('broadcastLink');
+  if (vl) { vl.href = base + '/vote'; vl.textContent = base + '/vote'; }
+  if (bl) { bl.href = base + '/broadcast.html'; bl.textContent = base + '/broadcast.html'; }
+}
+
+// Load on startup (after socket connects)
+socket.on('connect', loadNetworkInfo);
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
