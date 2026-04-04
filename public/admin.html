@@ -197,10 +197,12 @@
 <div class="header">
   <div class="status-dot" id="statusDot"></div>
   <h1>🗳️ Управление голосованием</h1>
-  <div style="margin-left:auto; display:flex; gap:8px;">
-    <a href="/broadcast.html" target="_blank" class="btn btn-ghost btn-sm">📺 Эфир</a>
-    <a href="/vote" target="_blank" class="btn btn-ghost btn-sm">📱 Голосование</a>
+  <div style="margin-left:auto; display:flex; gap:8px; align-items:center;">
+    <a id="headerBroadcastLink" href="#" target="_blank" class="btn btn-ghost btn-sm">📺 Эфир</a>
+    <a id="headerVoteLink" href="#" target="_blank" class="btn btn-ghost btn-sm">📱 Голосование</a>
     <a href="/help.html" target="_blank" class="btn btn-ghost btn-sm">📖 Инструкция</a>
+    <span id="headerUser" style="font-size:13px;color:#888;border-left:1px solid #333;padding-left:12px;margin-left:4px;"></span>
+    <button class="btn btn-ghost btn-sm" onclick="logout()">🚪 Выйти</button>
   </div>
 </div>
 
@@ -410,7 +412,22 @@
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
-const socket = io();
+// Auth guard
+const AUTH_TOKEN = localStorage.getItem('auth_token');
+const AUTH_USER  = JSON.parse(localStorage.getItem('auth_user') || 'null');
+if (!AUTH_TOKEN) { location.replace('/login.html'); throw new Error('redirect'); }
+
+fetch('/api/auth/me', { headers: { 'Authorization': 'Bearer ' + AUTH_TOKEN } })
+  .then(r => { if (!r.ok) { localStorage.removeItem('auth_token'); location.replace('/login.html'); } })
+  .catch(() => {});
+
+function logout() {
+  localStorage.removeItem('auth_token');
+  localStorage.removeItem('auth_user');
+  location.replace('/login.html');
+}
+
+const socket = io({ auth: { token: AUTH_TOKEN } });
 let state = {
   questions: [], currentQuestionId: null, broadcastMode: 'qr',
   displaySettings: {}, votingOpen: false,
@@ -455,6 +472,8 @@ function updateAllUI() {
   updateFontUI();
   updateVotingControl();
   updateLinks();
+  const hu = document.getElementById('headerUser');
+  if (hu && AUTH_USER) hu.textContent = AUTH_USER.displayName || AUTH_USER.username;
 }
 
 // ── Questions ──────────────────────────────────────────────
@@ -642,7 +661,7 @@ async function uploadBgImage(input) {
   const file = input.files[0]; if (!file) return;
   const fd = new FormData(); fd.append('image', file);
   try {
-    const res = await fetch('/api/upload', { method: 'POST', body: fd });
+    const res = await fetch('/api/upload', { method: 'POST', body: fd, headers: { 'Authorization': 'Bearer ' + AUTH_TOKEN } });
     const data = await res.json();
     if (data.url) {
       state.backgroundSettings.imageUrl = data.url;
@@ -770,10 +789,19 @@ function applyCustomUrl() {
 
 function updateLinks() {
   const base = state.baseUrl || window.location.origin;
-  const vl = document.getElementById('voteLink');
-  const bl = document.getElementById('broadcastLink');
-  if (vl) { vl.href = base + '/vote'; vl.textContent = base + '/vote'; }
-  if (bl) { bl.href = base + '/broadcast.html'; bl.textContent = base + '/broadcast.html'; }
+  const user = AUTH_USER?.username || '';
+  const voteUrl      = base + '/u/' + user;
+  const broadcastUrl = base + '/broadcast.html?user=' + user;
+
+  const vl  = document.getElementById('voteLink');
+  const bl  = document.getElementById('broadcastLink');
+  const hvl = document.getElementById('headerVoteLink');
+  const hbl = document.getElementById('headerBroadcastLink');
+
+  if (vl)  { vl.href  = voteUrl;      vl.textContent  = voteUrl; }
+  if (bl)  { bl.href  = broadcastUrl; bl.textContent  = broadcastUrl; }
+  if (hvl) { hvl.href = voteUrl; }
+  if (hbl) { hbl.href = broadcastUrl; }
 }
 
 // Load on startup (after socket connects)

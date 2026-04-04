@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Вход — Голосование</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #0f1117; color: #e0e0e0;
+    min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; padding: 24px 16px;
+  }
+  .logo { font-size: 28px; font-weight: 700; color: #fff; margin-bottom: 6px; display: flex; align-items: center; gap: 10px; }
+  .logo-sub { font-size: 13px; color: #555; margin-bottom: 36px; text-align: center; }
+  .card { background: #1a1d2e; border: 1px solid #2a2d3e; border-radius: 20px; padding: 32px 28px; width: 100%; max-width: 420px; animation: fadeUp 0.35s ease; }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+  .tabs { display: flex; gap: 4px; background: #0f1117; border-radius: 10px; padding: 4px; margin-bottom: 28px; }
+  .tab { flex: 1; padding: 9px; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.15s; background: transparent; color: #666; }
+  .tab.active { background: #6366f1; color: #fff; }
+  .tab:hover:not(.active) { color: #aaa; }
+  .form { display: flex; flex-direction: column; gap: 16px; }
+  .form.hidden { display: none; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
+  .field input { background: #0f1117; border: 1px solid #2a2d3e; border-radius: 10px; padding: 11px 14px; font-size: 15px; color: #e0e0e0; outline: none; transition: border-color 0.15s; font-family: inherit; }
+  .field input:focus { border-color: #6366f1; }
+  .field input::placeholder { color: #444; }
+  .hint { font-size: 11px; color: #555; }
+  .submit-btn { padding: 14px; background: #6366f1; color: #fff; border: none; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.15s; margin-top: 4px; }
+  .submit-btn:hover { background: #5558e8; }
+  .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .error-msg { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); border-radius: 10px; padding: 10px 14px; font-size: 13px; color: #f87171; display: none; }
+  .error-msg.show { display: block; }
+  .footer { margin-top: 24px; font-size: 12px; color: #444; text-align: center; }
+</style>
+</head>
+<body>
+<div class="logo">🗳️ LiveVote</div>
+<div class="logo-sub">Система живого голосования</div>
+<div class="card">
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('login')">Вход</button>
+    <button class="tab" onclick="switchTab('register')">Регистрация</button>
+  </div>
+  <form class="form" id="loginForm" onsubmit="doLogin(event)">
+    <div class="field">
+      <label>Логин</label>
+      <input type="text" id="loginUsername" placeholder="your_login" autocomplete="username" required>
+    </div>
+    <div class="field">
+      <label>Пароль</label>
+      <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password" required>
+    </div>
+    <div class="error-msg" id="loginError"></div>
+    <button type="submit" class="submit-btn" id="loginBtn">Войти</button>
+  </form>
+  <form class="form hidden" id="registerForm" onsubmit="doRegister(event)">
+    <div class="field">
+      <label>Логин</label>
+      <input type="text" id="regUsername" placeholder="my_channel" autocomplete="username" required>
+      <span class="hint">3–30 символов: латиница, цифры, подчёркивание</span>
+    </div>
+    <div class="field">
+      <label>Отображаемое имя (необязательно)</label>
+      <input type="text" id="regDisplayName" placeholder="Моё шоу">
+    </div>
+    <div class="field">
+      <label>Пароль</label>
+      <input type="password" id="regPassword" placeholder="минимум 6 символов" autocomplete="new-password" required>
+    </div>
+    <div class="error-msg" id="registerError"></div>
+    <button type="submit" class="submit-btn" id="registerBtn">Создать аккаунт</button>
+  </form>
+</div>
+<div class="footer">После входа откроется панель управления голосованием</div>
+<script>
+const token = localStorage.getItem('auth_token');
+if (token) {
+  fetch('/api/auth/me', { headers: { 'Authorization': 'Bearer ' + token } })
+    .then(r => r.ok ? location.replace('/admin.html') : null).catch(() => {});
+}
+function switchTab(tab) {
+  document.getElementById('loginForm').classList.toggle('hidden', tab !== 'login');
+  document.getElementById('registerForm').classList.toggle('hidden', tab !== 'register');
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', (i===0)===(tab==='login')));
+}
+async function doLogin(e) {
+  e.preventDefault();
+  const btn=document.getElementById('loginBtn'), errEl=document.getElementById('loginError');
+  btn.disabled=true; btn.textContent='Вход...'; errEl.classList.remove('show');
+  try {
+    const res=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:document.getElementById('loginUsername').value.trim(),password:document.getElementById('loginPassword').value})});
+    const data=await res.json();
+    if(res.ok){localStorage.setItem('auth_token',data.token);localStorage.setItem('auth_user',JSON.stringify(data.user));location.replace('/admin.html');}
+    else{errEl.textContent=data.error||'Ошибка входа';errEl.classList.add('show');}
+  } catch{errEl.textContent='Ошибка сети';errEl.classList.add('show');}
+  finally{btn.disabled=false;btn.textContent='Войти';}
+}
+async function doRegister(e) {
+  e.preventDefault();
+  const btn=document.getElementById('registerBtn'), errEl=document.getElementById('registerError');
+  btn.disabled=true; btn.textContent='Создание...'; errEl.classList.remove('show');
+  try {
+    const res=await fetch('/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:document.getElementById('regUsername').value.trim(),displayName:document.getElementById('regDisplayName').value.trim(),password:document.getElementById('regPassword').value})});
+    const data=await res.json();
+    if(res.ok){localStorage.setItem('auth_token',data.token);localStorage.setItem('auth_user',JSON.stringify(data.user));location.replace('/admin.html');}
+    else{errEl.textContent=data.error||'Ошибка регистрации';errEl.classList.add('show');}
+  } catch{errEl.textContent='Ошибка сети';errEl.classList.add('show');}
+  finally{btn.disabled=false;btn.textContent='Создать аккаунт';}
+}
+</script>
+</body>
+</html>

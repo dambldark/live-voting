@@ -184,7 +184,14 @@
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
-const socket = io();
+// Get username from URL ?user=
+const params = new URLSearchParams(window.location.search);
+const BROADCAST_USER = params.get('user') || '';
+if (!BROADCAST_USER) {
+  document.getElementById('scene').innerHTML = '<div class="empty-scene">Укажите ?user=логин в URL эфира</div>';
+}
+
+const socket = io({ auth: { publicUser: BROADCAST_USER } });
 let currentState = null;
 
 socket.on('state_update', (s) => {

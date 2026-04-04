@@ -5,3 +5,6 @@ public/uploads/*
 *.log
 .env
 .claude/
+
+users.json
+data/
