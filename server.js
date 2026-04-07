@@ -132,7 +132,7 @@ app.post('/api/upload', authMiddleware, upload.single('image'), (req,res)=>{
 });
 
 app.post('/api/vote',(req,res)=>{
-  const {questionId,optionIds,user:username}=req.body;
+  const {questionId,optionIds,previousOptionIds,user:username}=req.body;
   if(!username) return res.json({success:false,error:'Missing user'});
   const state=loadUserState(username);
   if(!state.votingOpen) return res.json({success:false,error:'Голосование закрыто'});
@@ -140,6 +140,10 @@ app.post('/api/vote',(req,res)=>{
   if(!question||question.id!==state.currentQuestionId) return res.json({success:false,error:'Вопрос не найден или не активен'});
   const ids=Array.isArray(optionIds)?optionIds:[optionIds];
   if(question.type==='single'&&ids.length>1) return res.json({success:false,error:'Можно выбрать только один вариант'});
+  // Decrement previous votes if re-voting
+  if(Array.isArray(previousOptionIds)&&previousOptionIds.length>0){
+    previousOptionIds.forEach(id=>{ const opt=question.options.find(o=>o.id===id); if(opt&&opt.votes>0) opt.votes-=1; });
+  }
   ids.forEach(id=>{ const opt=question.options.find(o=>o.id===id); if(opt) opt.votes+=1; });
   saveUserState(username);
   io.to(room(username)).emit('state_update',getPublicState(state));

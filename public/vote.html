@@ -163,9 +163,14 @@ const STORAGE_REVOTE_KEY = 'revoted_questions';
 function getVotedMap()   { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)        || '{}'); } catch { return {}; } }
 function getRevotedMap() { try { return JSON.parse(localStorage.getItem(STORAGE_REVOTE_KEY) || '{}'); } catch { return {}; } }
 
-function markVoted(questionId) {
-  const map = getVotedMap(); map[questionId] = Date.now();
+function markVoted(questionId, optIds) {
+  const map = getVotedMap(); map[questionId] = { ts: Date.now(), optionIds: optIds || [] };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
+}
+function getVotedOptions(questionId) {
+  const entry = getVotedMap()[questionId];
+  if (!entry) return [];
+  return Array.isArray(entry.optionIds) ? entry.optionIds : [];
 }
 function unmarkVoted(questionId) {
   const map = getVotedMap(); delete map[questionId];
@@ -263,9 +268,14 @@ function renderSuccess(root, q) {
     </div>`;
 }
 
+let isRevoting = false;
+let revotingQuestionId = null;
+
 function startRevote(questionId) {
-  markRevoted(questionId);   // использована единственная попытка
-  unmarkVoted(questionId);   // снимаем флаг — теперь можно голосовать снова
+  markRevoted(questionId);
+  isRevoting = true;
+  revotingQuestionId = questionId;
+  unmarkVoted(questionId);
   selectedOptions.clear();
   votedQuestionId = questionId;
   if (currentState) renderVoting(document.getElementById('root'), currentState.currentQuestion, currentState);
@@ -294,11 +304,12 @@ async function submitVote(questionId) {
     const res = await fetch('/api/vote', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ questionId, optionIds: [...selectedOptions], user: VOTE_USER })
+      body: JSON.stringify({ questionId, optionIds: [...selectedOptions], previousOptionIds: isRevoting ? getVotedOptions(questionId) : [], user: VOTE_USER })
     });
     const data = await res.json();
     if (data.success) {
-      markVoted(questionId);
+      markVoted(questionId, [...selectedOptions]);
+      isRevoting = false; revotingQuestionId = null;
       if (currentState) renderSuccess(document.getElementById('root'), currentState.currentQuestion);
     } else {
       alert(data.error || 'Ошибка голосования');
