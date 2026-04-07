@@ -257,7 +257,7 @@ function renderVoting(root, q, s) {
          onclick="toggleOption('${opt.id}', '${q.type}', ${maxAns})">
       <div class="check ${useSquare ? 'square' : ''}"></div>
       ${optImg}
-      <div class="option-text">${escHtml(opt.text)}</div>
+      <div class="option-text">${safeHtml(opt.text)}</div>
     </div>
   `;
   }).join('');
@@ -270,7 +270,7 @@ function renderVoting(root, q, s) {
   root.innerHTML = `
     <div class="card">
       <div class="q-label">Вопрос <span class="live-badge">LIVE</span></div>
-      <div class="q-text">${escHtml(q.text)}</div>
+      <div class="q-text">${safeHtml(q.text)}</div>
       ${qImg}
       <div class="q-hint">${hint}</div>
       <div class="options">${optionsHtml}</div>
@@ -356,6 +356,11 @@ async function submitVote(questionId) {
 
 function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function safeHtml(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/&lt;(\/?(b|i|u))&gt;/g,'<$1>');
 }
 </script>
 </body>

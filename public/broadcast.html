@@ -28,8 +28,9 @@
     background: rgba(15,17,30,0.88);
     border: 2px solid rgba(99,102,241,0.4);
     border-radius: 24px; padding: 40px 48px;
+    width: 100%; min-height: 100%;
     display: flex; flex-direction: column;
-    align-items: center; gap: 20px;
+    align-items: center; justify-content: center; gap: 20px;
     backdrop-filter: blur(12px);
     animation: fadeIn 0.5s ease;
   }
@@ -50,7 +51,7 @@
     border: 2px solid rgba(99,102,241,0.4);
     border-radius: 24px;
     padding: clamp(24px, 4vw, 56px);
-    width: 100%; max-width: 960px;
+    width: 100%; min-height: 100%;
     text-align: center;
     backdrop-filter: blur(12px);
     animation: fadeIn 0.5s ease;
@@ -73,7 +74,7 @@
     border: 2px solid rgba(99,102,241,0.4);
     border-radius: 24px;
     padding: clamp(20px, 3.5vw, 48px);
-    width: 100%;
+    width: 100%; min-height: 100%;
     display: flex; align-items: center;
     gap: clamp(24px, 4vw, 60px);
     backdrop-filter: blur(12px);
@@ -184,6 +185,8 @@
 </style>
 <!-- Dynamic background + font overrides injected here -->
 <style id="dynamic-style"></style>
+<!-- Card overlay CSS injected here -->
+<style id="card-style"></style>
 </head>
 <body>
 
@@ -268,7 +271,8 @@ function applySettings(s) {
     body { font-family: ${family}; }
   `;
 
-  document.getElementById('dynamic-style').textContent = bgCSS + cardCSS + fontCSS;
+  document.getElementById('dynamic-style').textContent = bgCSS + fontCSS;
+  document.getElementById('card-style').textContent = cardCSS;
 }
 
 // Lazy-load Google Fonts only when needed
@@ -368,7 +372,7 @@ function renderQuestion(scene, s) {
   scene.innerHTML = `
     <div class="question-card">
       <div class="question-label">Вопрос</div>
-      <div class="question-text">${escHtml(q.text)}</div>
+      <div class="question-text">${safeHtml(q.text)}</div>
       ${imgHtml}
     </div>`;
 }
@@ -385,7 +389,7 @@ function renderBoth(scene, s) {
       </div>
       <div class="both-question">
         <div class="question-label">Вопрос</div>
-        <div class="question-text">${escHtml(q.text)}</div>
+        <div class="question-text">${safeHtml(q.text)}</div>
         ${q.imageUrl ? '<img class="question-img" src="' + q.imageUrl + '" alt="" style="max-height:120px;">' : ''}
       </div>
     </div>`;
@@ -432,7 +436,7 @@ function renderResults(scene, s) {
           <div class="option-rank">#${rank}</div>
           <div class="option-text-wrap">
             ${opt.imageUrl ? '<img class="option-img" src="' + opt.imageUrl + '" alt="">' : ''}
-            <div class="option-text-val">${escHtml(opt.text)}</div>
+            <div class="option-text-val">${safeHtml(opt.text)}</div>
           </div>
           <div class="option-value ${isLeading ? 'leading' : ''}">${valueHtml(opt.votes, pct, ds.showMode)}</div>
         </div>
@@ -447,7 +451,7 @@ function renderResults(scene, s) {
   scene.innerHTML = `
     <div class="results-card">
       <div class="results-header">
-        <div class="results-question">${escHtml(q.text)}</div>
+        <div class="results-question">${safeHtml(q.text)}</div>
         ${qImgHtml}
         <div class="results-meta">${metaHtml}</div>
       </div>
@@ -526,6 +530,11 @@ function generateQR(imgId, url, size) {
 
 function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function safeHtml(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/&lt;(\/?(b|i|u))&gt;/g,'<$1>');
 }
 </script>
 </body>

@@ -217,7 +217,7 @@
     <div id="addQuestionForm" style="display:none; margin-top:12px; background:#1a1d2e; border-radius:10px; padding:14px;">
       <div class="field">
         <label>Текст вопроса</label>
-        <textarea id="newQuestionText" placeholder="Введите вопрос..."></textarea>
+        <textarea id="newQuestionText" placeholder="Введите вопрос..." onfocus="showFmtToolbar(this)" onblur="hideFmtToolbar(event)"></textarea>
       </div>
       <div class="field">
         <label>Тип ответа</label>
@@ -348,6 +348,48 @@
 
     <div class="divider"></div>
 
+    <!-- Card overlay -->
+    <div class="broadcast-section">
+      <h3>Подложка карточки</h3>
+      <div class="bg-type-row">
+        <div class="bg-btn active" id="cardBtnDefault" onclick="setCardType('default')">Авто</div>
+        <div class="bg-btn" id="cardBtnTransparent" onclick="setCardType('transparent')">Прозрачная</div>
+        <div class="bg-btn" id="cardBtnColor" onclick="setCardType('color')">Цвет</div>
+        <div class="bg-btn" id="cardBtnImage" onclick="setCardType('image')">Картинка</div>
+      </div>
+      <div id="cardColorWrap" style="display:none; margin-bottom:8px;">
+        <div class="color-input-wrap">
+          <input type="color" id="cardColorInput" value="#0f111e" oninput="setCardSetting('color', this.value)">
+        </div>
+      </div>
+      <div id="cardImageWrap" style="display:none; margin-bottom:8px;">
+        <input type="file" id="cardImageInput" accept="image/*" style="display:none" onchange="uploadCardImage(this)">
+        <div class="upload-area" onclick="document.getElementById('cardImageInput').click()">
+          <div style="font-size:24px;">🖼️</div>
+          <p>Нажмите для выбора изображения</p>
+        </div>
+        <div id="cardImagePreview"></div>
+        <select id="cardFitSelect" style="margin-top:6px;" onchange="setCardSetting('imageFit', this.value)">
+          <option value="cover">Заполнить</option>
+          <option value="contain">Вместить</option>
+          <option value="stretch">Растянуть</option>
+          <option value="original">Оригинал</option>
+          <option value="fit-width">По ширине</option>
+          <option value="fit-height">По высоте</option>
+        </select>
+      </div>
+      <div class="setting-row">
+        <label>Прозрачность</label>
+        <div class="scale-row" style="flex:1; margin-left:8px;">
+          <input type="range" id="cardOpacityRange" min="0" max="100" value="88" step="1"
+            oninput="onCardOpacityChange(this.value)">
+          <span class="scale-val" id="cardOpacityVal">88%</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
     <!-- Font settings -->
     <div class="broadcast-section">
       <h3>Шрифт</h3>
@@ -413,6 +455,14 @@
       </div>
     </div>
   </div>
+</div>
+
+<div id="fmtToolbar" style="display:none; position:fixed; z-index:9999; background:#1a1d2e; border:1px solid #3a3d4e; border-radius:8px; padding:4px 6px; gap:4px; align-items:center; box-shadow:0 4px 12px rgba(0,0,0,0.4);">
+  <button onclick="fmtApply('bold')" title="Жирный" style="background:none;border:none;color:#e0e0e0;cursor:pointer;font-weight:bold;font-size:14px;padding:2px 6px;border-radius:4px;">B</button>
+  <button onclick="fmtApply('italic')" title="Курсив" style="background:none;border:none;color:#e0e0e0;cursor:pointer;font-style:italic;font-size:14px;padding:2px 6px;border-radius:4px;">I</button>
+  <button onclick="fmtApply('underline')" title="Подчёркнутый" style="background:none;border:none;color:#e0e0e0;cursor:pointer;text-decoration:underline;font-size:14px;padding:2px 6px;border-radius:4px;">U</button>
+  <div style="width:1px;height:16px;background:#333;margin:0 2px;"></div>
+  <button onclick="fmtClear()" title="Очистить форматирование" style="background:none;border:none;color:#888;cursor:pointer;font-size:12px;padding:2px 6px;border-radius:4px;">✕</button>
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -528,9 +578,10 @@ function renderEditor(id) {
     <div class="question-editor">
       <div class="field">
         <label>Текст вопроса</label>
-        <div style="display:flex;gap:6px;align-items:flex-start;">
-          <textarea id="editQText" style="flex:1;" onblur="saveQuestion('${q.id}')">${escHtml(q.text)}</textarea>
-          <button class="img-upload-btn" title="Изображение вопроса" onclick="uploadQuestionImage('${q.id}')">🖼</button>
+        <div style="position:relative;">
+          <textarea id="editQText" style="flex:1;padding-right:36px;" onblur="saveQuestion('${q.id}');hideFmtToolbar(event)" onfocus="showFmtToolbar(this)">${escHtml(q.text)}</textarea>
+          <button class="btn btn-primary btn-sm" onclick="uploadQuestionImage('${q.id}')"
+            style="position:absolute;top:6px;right:6px;padding:4px 7px;" title="Добавить картинку к вопросу">🖼</button>
         </div>
         ${q.imageUrl ? `<div style="position:relative;margin-top:6px;"><img class="q-img-preview" src="${q.imageUrl}"><button class="btn btn-danger btn-sm" style="position:absolute;top:4px;right:4px;padding:2px 6px;" onclick="removeQuestionImage('${q.id}')">✕</button></div>` : ''}
       </div>
@@ -539,12 +590,12 @@ function renderEditor(id) {
         <div class="type-toggle">
           <div class="type-btn ${!isMulti && !isCount ? 'active' : ''}" onclick="setQuestionType('${q.id}','single')">Один вариант</div>
           <div class="type-btn ${isMulti ? 'active' : ''}" onclick="setQuestionType('${q.id}','multiple')">Несколько вариантов</div>
-          <div class="type-btn ${isCount ? 'active' : ''}" onclick="setQuestionType('${q.id}','count')">Кол-во: <span id="editorCountLabel">${maxAns}</span></div>
-        </div>
-        <div class="count-input-wrap ${isCount ? 'visible' : ''}" id="editorCountWrap">
-          <label>Выбрать ровно:</label>
-          <input type="number" id="editorMaxAnswers" min="2" max="20" value="${maxAns}"
-            onchange="setQuestionMaxAnswers('${q.id}', this.value)">
+          <div class="type-btn ${isCount ? 'active' : ''}" onclick="setQuestionType('${q.id}','count')" style="display:flex;align-items:center;gap:4px;justify-content:center;">
+            <span>Кол-во:</span>
+            <button onclick="event.stopPropagation();changeMaxAnswers('${q.id}',-1)" style="background:none;border:none;color:inherit;cursor:pointer;font-size:14px;padding:0 2px;">−</button>
+            <span id="maxAnswersDisplay_${q.id}" onclick="event.stopPropagation();startEditMaxAnswers('${q.id}')" style="cursor:text;min-width:18px;text-align:center;">${maxAns}</span>
+            <button onclick="event.stopPropagation();changeMaxAnswers('${q.id}',1)" style="background:none;border:none;color:inherit;cursor:pointer;font-size:14px;padding:0 2px;">+</button>
+          </div>
         </div>
       </div>
       <div class="field">
@@ -553,7 +604,7 @@ function renderEditor(id) {
           ${q.options.map(o => `
             <div class="option-item">
               ${o.imageUrl ? `<img class="opt-img-preview" src="${o.imageUrl}">` : ''}
-              <input type="text" value="${escHtml(o.text)}" onblur="saveOption('${o.id}', this.value)">
+              <input type="text" value="${escHtml(o.text)}" onfocus="showFmtToolbar(this)" onblur="saveOption('${o.id}', this.value);hideFmtToolbar(event)">
               <span class="option-votes">${o.votes} гол.</span>
               <button class="img-upload-btn" title="Изображение варианта" onclick="uploadOptionImage('${o.id}')">🖼</button>
               ${o.imageUrl ? `<button class="btn btn-ghost btn-sm" onclick="removeOptionImage('${o.id}')">✕🖼</button>` : ''}
@@ -561,7 +612,8 @@ function renderEditor(id) {
             </div>`).join('')}
         </div>
         <div class="add-option-row">
-          <input type="text" id="newOptionText" placeholder="Новый вариант..." onkeydown="if(event.key==='Enter') addOption('${q.id}')">
+          <input type="text" id="newOptionText" placeholder="Новый вариант..." onfocus="showFmtToolbar(this)" onblur="hideFmtToolbar(event)" onkeydown="if(event.key==='Enter') addOption('${q.id}')">
+          <button class="btn btn-primary btn-sm" onclick="addOptionImage('${q.id}')" title="Добавить картинку к варианту">🖼</button>
           <button class="btn btn-primary btn-sm" onclick="addOption('${q.id}')">+</button>
         </div>
       </div>
@@ -677,10 +729,30 @@ function removeOptionImage(oId) {
   socket.emit('set_option_image', { id: oId, imageUrl: null });
 }
 
+let _pendingOptionImageUrl = null;
+
+async function addOptionImage(qId) {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/*';
+  input.onchange = async () => {
+    const file = input.files[0]; if (!file) return;
+    const fd = new FormData(); fd.append('image', file);
+    try {
+      const res = await fetch('/api/upload', { method:'POST', body:fd, headers:{'Authorization':'Bearer '+AUTH_TOKEN} });
+      const data = await res.json();
+      if (data.url) { _pendingOptionImageUrl = data.url; addOption(qId); }
+    } catch { alert('Ошибка загрузки'); }
+  };
+  input.click();
+}
+
 function addOption(qId) {
   const input = document.getElementById('newOptionText');
-  const text = input?.value.trim(); if (!text) return;
-  socket.emit('add_option', { questionId: qId, text });
+  const text = input?.value.trim() || '';
+  const imageUrl = _pendingOptionImageUrl || null;
+  _pendingOptionImageUrl = null;
+  if (!text && !imageUrl) return;
+  socket.emit('add_option', { questionId: qId, text: text || ' ', imageUrl });
   if (input) input.value = '';
 }
 function saveOption(id, text) { if (text.trim()) socket.emit('update_option', { id, text: text.trim() }); }
@@ -939,6 +1011,68 @@ socket.on('connect', loadNetworkInfo);
 
 function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Change 4: Inline maxAnswers controls ───────────────────
+function changeMaxAnswers(qId, delta) {
+  const q = questions.find(q => q.id === qId);
+  if (!q) return;
+  const newVal = Math.max(2, Math.min(q.options.length || 10, (q.maxAnswers || 2) + delta));
+  socket.emit('update_question', { id: qId, maxAnswers: newVal });
+}
+function startEditMaxAnswers(qId) {
+  const el = document.getElementById('maxAnswersDisplay_' + qId);
+  if (!el) return;
+  const q = questions.find(q => q.id === qId);
+  const cur = q?.maxAnswers || 2;
+  el.innerHTML = '<input type="number" min="2" max="20" value="' + cur + '" style="width:32px;background:transparent;border:none;border-bottom:1px solid #6366f1;color:inherit;text-align:center;font-size:inherit;" onblur="saveMaxAnswers(\'' + qId + '\',this.value)" onkeydown="if(event.key===\'Enter\')this.blur()" onclick="event.stopPropagation()" autofocus>';
+}
+function saveMaxAnswers(qId, val) {
+  const n = Math.max(2, Math.min(20, parseInt(val) || 2));
+  socket.emit('update_question', { id: qId, maxAnswers: n });
+}
+
+// ── Change 5: Rich-text formatting toolbar ─────────────────
+let fmtTarget = null;
+
+function showFmtToolbar(el) {
+  fmtTarget = el;
+  const toolbar = document.getElementById('fmtToolbar');
+  const rect = el.getBoundingClientRect();
+  toolbar.style.display = 'flex';
+  toolbar.style.top  = Math.max(4, rect.top - 44) + 'px';
+  toolbar.style.left = rect.left + 'px';
+}
+function hideFmtToolbar(e) {
+  if (e && e.relatedTarget && document.getElementById('fmtToolbar').contains(e.relatedTarget)) return;
+  document.getElementById('fmtToolbar').style.display = 'none';
+  fmtTarget = null;
+}
+function fmtApply(cmd) {
+  if (!fmtTarget) return;
+  const start = fmtTarget.selectionStart;
+  const end   = fmtTarget.selectionEnd;
+  if (start === end) return;
+  const text   = fmtTarget.value;
+  const sel    = text.slice(start, end);
+  const tags   = { bold: ['<b>','</b>'], italic: ['<i>','</i>'], underline: ['<u>','</u>'] };
+  const [open, close] = tags[cmd];
+  const newText = text.slice(0,start) + open + sel + close + text.slice(end);
+  fmtTarget.value = newText;
+  fmtTarget.dispatchEvent(new Event('input'));
+  fmtTarget.focus();
+  fmtTarget.setSelectionRange(start + open.length, end + open.length);
+}
+function fmtClear() {
+  if (!fmtTarget) return;
+  const start = fmtTarget.selectionStart;
+  const end   = fmtTarget.selectionEnd;
+  const text  = fmtTarget.value;
+  const sel   = text.slice(start, end);
+  const clean = sel.replace(/<\/?(b|i|u|strong|em)>/gi, '');
+  const newText = text.slice(0,start) + clean + text.slice(end);
+  fmtTarget.value = newText;
+  fmtTarget.focus();
 }
 </script>
 </body>
