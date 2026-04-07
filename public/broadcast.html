@@ -163,6 +163,15 @@
 
   .empty-scene { text-align: center; color: rgba(255,255,255,0.15); font-size: clamp(16px, 2.5vw, 28px); }
 
+  .question-img {
+    max-width: 100%; max-height: 200px; object-fit: contain;
+    border-radius: 12px; margin-top: 16px;
+  }
+  .option-img {
+    width: 40px; height: 40px; object-fit: cover;
+    border-radius: 6px; flex-shrink: 0;
+  }
+
   .live-dot {
     display: inline-block; width: 8px; height: 8px;
     border-radius: 50%; background: #f87171;
@@ -204,24 +213,43 @@ socket.on('state_update', (s) => {
 function applySettings(s) {
   const bg   = s.backgroundSettings || {};
   const font = s.fontSettings       || {};
+  const card = s.cardSettings       || {};
 
   // Background
   let bgCSS = '';
   if (bg.type === 'color' && bg.color) {
-    bgCSS = `html,body { background: ${bg.color} !important; }`;
+    bgCSS = 'html,body { background: ' + bg.color + ' !important; }';
   } else if (bg.type === 'image' && bg.imageUrl) {
-    bgCSS = `html,body { background: url('${bg.imageUrl}') center/cover no-repeat !important; }`;
+    bgCSS = "html,body { background: url('" + bg.imageUrl + "') center/cover no-repeat !important; }";
   } else {
     // transparent — OBS chroma / alpha
-    bgCSS = `html,body { background: transparent !important; }`;
+    bgCSS = 'html,body { background: transparent !important; }';
   }
+
+  // Card overlay CSS
+  const cardSelectors = '.qr-card, .question-card, .both-card, .results-card';
+  let cardCSS = '';
+  const opacity = card.opacity !== undefined ? card.opacity : 0.88;
+
+  if (card.type === 'transparent') {
+    cardCSS = cardSelectors + ' { background: transparent !important; border-color: transparent !important; backdrop-filter: none !important; }';
+  } else if (card.type === 'color' && card.color) {
+    const hex = card.color.replace('#','');
+    const r = parseInt(hex.substring(0,2),16), g = parseInt(hex.substring(2,4),16), b = parseInt(hex.substring(4,6),16);
+    cardCSS = cardSelectors + ' { background: rgba(' + r + ',' + g + ',' + b + ',' + opacity + ') !important; }';
+  } else if (card.type === 'image' && card.imageUrl) {
+    const fitMap = { cover:'cover', contain:'contain', stretch:'100% 100%', original:'auto', 'fit-width':'100% auto', 'fit-height':'auto 100%' };
+    const bgSize = fitMap[card.imageFit || 'cover'] || 'cover';
+    cardCSS = cardSelectors + " { background-image: url('" + card.imageUrl + "') !important; background-size: " + bgSize + " !important; background-position: center !important; background-repeat: no-repeat !important; opacity: " + opacity + "; }";
+  }
+  // else 'default' — keep built-in card CSS
 
   // Font family — preload Google fonts dynamically if needed
   const family = font.family || "'Segoe UI', Arial, sans-serif";
   loadGoogleFontIfNeeded(family);
 
   // Scale (1.0 = 100%)
-  const scale   = font.sizeScale ?? 1.0;
+  const scale   = font.sizeScale !== undefined ? font.sizeScale : 1.0;
   const color   = font.color    || '#ffffff';
   const weight  = font.bold     ? '700' : 'normal';
   const italic  = font.italic   ? 'italic' : 'normal';
@@ -237,7 +265,7 @@ function applySettings(s) {
     body { font-family: ${family}; }
   `;
 
-  document.getElementById('dynamic-style').textContent = bgCSS + fontCSS;
+  document.getElementById('dynamic-style').textContent = bgCSS + cardCSS + fontCSS;
 }
 
 // Lazy-load Google Fonts only when needed
@@ -292,10 +320,12 @@ function renderQR(scene, s) {
 
 function renderQuestion(scene, s) {
   const q = s.currentQuestion;
+  const imgHtml = q.imageUrl ? '<img class="question-img" src="' + q.imageUrl + '" alt="">' : '';
   scene.innerHTML = `
     <div class="question-card">
       <div class="question-label">Вопрос</div>
       <div class="question-text">${escHtml(q.text)}</div>
+      ${imgHtml}
     </div>`;
 }
 
@@ -312,6 +342,7 @@ function renderBoth(scene, s) {
       <div class="both-question">
         <div class="question-label">Вопрос</div>
         <div class="question-text">${escHtml(q.text)}</div>
+        ${q.imageUrl ? '<img class="question-img" src="' + q.imageUrl + '" alt="" style="max-height:120px;">' : ''}
       </div>
     </div>`;
   generateQR('qrCode', url, qrSize);
@@ -356,6 +387,7 @@ function renderResults(scene, s) {
         <div class="option-content">
           <div class="option-rank">#${rank}</div>
           <div class="option-text-wrap">
+            ${opt.imageUrl ? '<img class="option-img" src="' + opt.imageUrl + '" alt="">' : ''}
             <div class="option-text-val">${escHtml(opt.text)}</div>
           </div>
           <div class="option-value ${isLeading ? 'leading' : ''}">${valueHtml(opt.votes, pct, ds.showMode)}</div>
@@ -367,10 +399,12 @@ function renderResults(scene, s) {
     ? `<div style="display:flex;align-items:center;gap:4px;"><span class="live-dot"></span>Проголосовало: <span class="total-count">${totalVotes}</span></div>`
     : '';
 
+  const qImgHtml = q.imageUrl ? '<img class="question-img" src="' + q.imageUrl + '" alt="" style="max-height:120px;margin-bottom:8px;">' : '';
   scene.innerHTML = `
     <div class="results-card">
       <div class="results-header">
         <div class="results-question">${escHtml(q.text)}</div>
+        ${qImgHtml}
         <div class="results-meta">${metaHtml}</div>
       </div>
       <div class="options-grid ${layoutClass}">${optionsHtml}</div>

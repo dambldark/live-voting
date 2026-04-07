@@ -224,6 +224,11 @@
         <div class="type-toggle">
           <div class="type-btn active" id="newTypeSingle" onclick="setNewType('single')">Один</div>
           <div class="type-btn" id="newTypeMulti" onclick="setNewType('multiple')">Несколько</div>
+          <div class="type-btn" id="newTypeCount" onclick="setNewType('count')">Кол-во</div>
+        </div>
+        <div class="count-input-wrap" id="newCountWrap">
+          <label>Выбрать ровно:</label>
+          <input type="number" id="newMaxAnswers" min="2" max="20" value="2">
         </div>
       </div>
       <div style="display:flex; gap:8px; margin-top:8px;">
@@ -432,7 +437,8 @@ let state = {
   questions: [], currentQuestionId: null, broadcastMode: 'qr',
   displaySettings: {}, votingOpen: false,
   backgroundSettings: { type: 'transparent', color: '#1a1d2e', imageUrl: null },
-  fontSettings: { family: "'Segoe UI', Arial, sans-serif", sizeScale: 1.0, color: '#ffffff', bold: false, italic: false }
+  fontSettings: { family: "'Segoe UI', Arial, sans-serif", sizeScale: 1.0, color: '#ffffff', bold: false, italic: false },
+  cardSettings: { type: 'default', color: '#0f111e', imageUrl: null, imageFit: 'cover', opacity: 0.88 }
 };
 let questions = [];
 let selectedQuestionId = null;
@@ -462,6 +468,7 @@ socket.on('state_update', (s) => {
   state.currentQuestionId = s.currentQuestion?.id || null;
   state.backgroundSettings = s.backgroundSettings;
   state.fontSettings = s.fontSettings;
+  if (s.cardSettings) state.cardSettings = s.cardSettings;
   updateAllUI();
 });
 
@@ -470,6 +477,7 @@ function updateAllUI() {
   updateDisplaySettingsUI();
   updateBgUI();
   updateFontUI();
+  updateCardUI();
   updateVotingControl();
   updateLinks();
   const hu = document.getElementById('headerUser');
@@ -487,7 +495,7 @@ function renderQuestionList() {
     <div class="question-item ${q.id === state.currentQuestionId ? 'active' : ''}" onclick="selectQuestion('${q.id}')">
       <div class="q-text">${escHtml(q.text)}</div>
       <div class="q-meta">
-        <span class="badge ${q.type === 'single' ? 'badge-single' : 'badge-multi'}">${q.type === 'single' ? 'Один' : 'Несколько'}</span>
+        <span class="badge ${q.type === 'single' ? 'badge-single' : q.type === 'count' ? 'badge-count' : 'badge-multi'}">${q.type === 'single' ? 'Один' : q.type === 'count' ? ('Кол-во:'+q.maxAnswers) : 'Несколько'}</span>
         <span>${q.options.length} вар.</span>
         <span>${totalVotes(q)} гол.</span>
         ${q.id === state.currentQuestionId ? '<span class="badge badge-active">Активен</span>' : ''}
@@ -513,18 +521,30 @@ function selectQuestion(id) { selectedQuestionId = id; renderEditor(id); }
 function renderEditor(id) {
   const q = questions.find(q => q.id === id);
   if (!q) return;
-  const isMulti = q.type === 'multiple';
+  const isMulti  = q.type === 'multiple';
+  const isCount  = q.type === 'count';
+  const maxAns   = q.maxAnswers || 2;
   document.getElementById('editorContainer').innerHTML = `
     <div class="question-editor">
       <div class="field">
         <label>Текст вопроса</label>
-        <textarea id="editQText" onblur="saveQuestion('${q.id}')">${escHtml(q.text)}</textarea>
+        <div style="display:flex;gap:6px;align-items:flex-start;">
+          <textarea id="editQText" style="flex:1;" onblur="saveQuestion('${q.id}')">${escHtml(q.text)}</textarea>
+          <button class="img-upload-btn" title="Изображение вопроса" onclick="uploadQuestionImage('${q.id}')">🖼</button>
+        </div>
+        ${q.imageUrl ? `<div style="position:relative;margin-top:6px;"><img class="q-img-preview" src="${q.imageUrl}"><button class="btn btn-danger btn-sm" style="position:absolute;top:4px;right:4px;padding:2px 6px;" onclick="removeQuestionImage('${q.id}')">✕</button></div>` : ''}
       </div>
       <div class="field">
         <label>Тип ответа</label>
         <div class="type-toggle">
-          <div class="type-btn ${!isMulti ? 'active' : ''}" onclick="setQuestionType('${q.id}','single')">Один вариант</div>
+          <div class="type-btn ${!isMulti && !isCount ? 'active' : ''}" onclick="setQuestionType('${q.id}','single')">Один вариант</div>
           <div class="type-btn ${isMulti ? 'active' : ''}" onclick="setQuestionType('${q.id}','multiple')">Несколько вариантов</div>
+          <div class="type-btn ${isCount ? 'active' : ''}" onclick="setQuestionType('${q.id}','count')">Кол-во: <span id="editorCountLabel">${maxAns}</span></div>
+        </div>
+        <div class="count-input-wrap ${isCount ? 'visible' : ''}" id="editorCountWrap">
+          <label>Выбрать ровно:</label>
+          <input type="number" id="editorMaxAnswers" min="2" max="20" value="${maxAns}"
+            onchange="setQuestionMaxAnswers('${q.id}', this.value)">
         </div>
       </div>
       <div class="field">
@@ -532,8 +552,11 @@ function renderEditor(id) {
         <div class="options-list">
           ${q.options.map(o => `
             <div class="option-item">
+              ${o.imageUrl ? `<img class="opt-img-preview" src="${o.imageUrl}">` : ''}
               <input type="text" value="${escHtml(o.text)}" onblur="saveOption('${o.id}', this.value)">
               <span class="option-votes">${o.votes} гол.</span>
+              <button class="img-upload-btn" title="Изображение варианта" onclick="uploadOptionImage('${o.id}')">🖼</button>
+              ${o.imageUrl ? `<button class="btn btn-ghost btn-sm" onclick="removeOptionImage('${o.id}')">✕🖼</button>` : ''}
               <button class="btn btn-danger btn-sm" onclick="deleteOption('${q.id}','${o.id}')">✕</button>
             </div>`).join('')}
         </div>
@@ -580,14 +603,30 @@ function setNewType(t) {
   newQuestionType = t;
   document.getElementById('newTypeSingle').classList.toggle('active', t === 'single');
   document.getElementById('newTypeMulti').classList.toggle('active', t === 'multiple');
+  document.getElementById('newTypeCount').classList.toggle('active', t === 'count');
+  const wrap = document.getElementById('newCountWrap');
+  if (wrap) wrap.classList.toggle('visible', t === 'count');
 }
 function addQuestion() {
   const text = document.getElementById('newQuestionText').value.trim();
   if (!text) return;
-  socket.emit('add_question', { text, type: newQuestionType });
+  const maxAnswers = parseInt(document.getElementById('newMaxAnswers')?.value) || 2;
+  socket.emit('add_question', { text, type: newQuestionType, maxAnswers });
   hideAddQuestion();
 }
-function setQuestionType(id, type) { socket.emit('update_question', { id, type }); }
+function setQuestionType(id, type) {
+  const q = questions.find(q => q.id === id);
+  const maxAnswers = q ? (q.maxAnswers || 2) : 2;
+  socket.emit('update_question', { id, type, maxAnswers });
+  const wrap = document.getElementById('editorCountWrap');
+  if (wrap) wrap.classList.toggle('visible', type === 'count');
+}
+function setQuestionMaxAnswers(id, val) {
+  const n = Math.max(2, parseInt(val) || 2);
+  const lbl = document.getElementById('editorCountLabel');
+  if (lbl) lbl.textContent = n;
+  socket.emit('update_question', { id, maxAnswers: n });
+}
 function saveQuestion(id) { const t = document.getElementById('editQText')?.value.trim(); if (t) socket.emit('update_question', { id, text: t }); }
 function deleteQuestion(id) {
   if (!confirm('Удалить вопрос?')) return;
@@ -601,6 +640,42 @@ function deleteQuestion(id) {
 function setCurrentQuestion(id) { socket.emit('set_current_question', id); state.currentQuestionId = id; selectQuestion(id); renderQuestionList(); }
 function toggleVoting(open) { socket.emit('set_voting_open', open); }
 function resetVotes() { if (!selectedQuestionId || !confirm('Сбросить все голоса?')) return; socket.emit('reset_votes', selectedQuestionId); }
+
+// ── Image uploads ──────────────────────────────────────────
+async function uploadQuestionImage(qId) {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/*';
+  input.onchange = async () => {
+    const file = input.files[0]; if (!file) return;
+    const fd = new FormData(); fd.append('image', file);
+    try {
+      const res = await fetch('/api/upload', { method:'POST', body:fd, headers:{'Authorization':'Bearer '+AUTH_TOKEN} });
+      const data = await res.json();
+      if (data.url) socket.emit('set_question_image', { id: qId, imageUrl: data.url });
+    } catch { alert('Ошибка загрузки'); }
+  };
+  input.click();
+}
+function removeQuestionImage(qId) {
+  socket.emit('set_question_image', { id: qId, imageUrl: null });
+}
+async function uploadOptionImage(oId) {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/*';
+  input.onchange = async () => {
+    const file = input.files[0]; if (!file) return;
+    const fd = new FormData(); fd.append('image', file);
+    try {
+      const res = await fetch('/api/upload', { method:'POST', body:fd, headers:{'Authorization':'Bearer '+AUTH_TOKEN} });
+      const data = await res.json();
+      if (data.url) socket.emit('set_option_image', { id: oId, imageUrl: data.url });
+    } catch { alert('Ошибка загрузки'); }
+  };
+  input.click();
+}
+function removeOptionImage(oId) {
+  socket.emit('set_option_image', { id: oId, imageUrl: null });
+}
 
 function addOption(qId) {
   const input = document.getElementById('newOptionText');
@@ -683,6 +758,61 @@ function updateBgUI() {
   if (bg.imageUrl) {
     const prev = document.getElementById('bgImagePreview');
     if (prev && !prev.innerHTML) prev.innerHTML = `<img src="${bg.imageUrl}">`;
+  }
+}
+
+// ── Card overlay ───────────────────────────────────────────
+function setCardType(type) {
+  state.cardSettings = { ...state.cardSettings, type };
+  socket.emit('update_card_settings', { type });
+  updateCardUI();
+}
+function setCardSetting(key, value) {
+  state.cardSettings = { ...state.cardSettings, [key]: value };
+  socket.emit('update_card_settings', { [key]: value });
+}
+async function uploadCardImage(input) {
+  const file = input.files[0]; if (!file) return;
+  const fd = new FormData(); fd.append('image', file);
+  try {
+    const res = await fetch('/api/upload', { method: 'POST', body: fd, headers: { 'Authorization': 'Bearer ' + AUTH_TOKEN } });
+    const data = await res.json();
+    if (data.url) {
+      state.cardSettings.imageUrl = data.url;
+      socket.emit('update_card_settings', { imageUrl: data.url });
+      const prev = document.getElementById('cardImagePreview');
+      if (prev) prev.innerHTML = '<img src="' + data.url + '" style="width:100%;border-radius:6px;margin-top:6px;max-height:80px;object-fit:cover;">';
+    }
+  } catch(e) { alert('Ошибка загрузки изображения'); }
+}
+function onCardOpacityChange(val) {
+  document.getElementById('cardOpacityVal').textContent = val + '%';
+  setCardSetting('opacity', parseFloat(val) / 100);
+}
+function updateCardUI() {
+  const cs = state.cardSettings || {};
+  ['cardBtnDefault','cardBtnTransparent','cardBtnColor','cardBtnImage'].forEach(function(id) {
+    const el = document.getElementById(id); if (el) el.classList.remove('active');
+  });
+  const typeMap = { default:'cardBtnDefault', transparent:'cardBtnTransparent', color:'cardBtnColor', image:'cardBtnImage' };
+  const activeBtn = document.getElementById(typeMap[cs.type] || 'cardBtnDefault');
+  if (activeBtn) activeBtn.classList.add('active');
+  const colorWrap = document.getElementById('cardColorWrap');
+  const imageWrap = document.getElementById('cardImageWrap');
+  if (colorWrap) colorWrap.style.display = cs.type === 'color' ? 'block' : 'none';
+  if (imageWrap) imageWrap.style.display = cs.type === 'image' ? 'block' : 'none';
+  const ci = document.getElementById('cardColorInput'); if (ci && cs.color) ci.value = cs.color;
+  const fitSel = document.getElementById('cardFitSelect'); if (fitSel && cs.imageFit) fitSel.value = cs.imageFit;
+  if (cs.imageUrl) {
+    const prev = document.getElementById('cardImagePreview');
+    if (prev && !prev.innerHTML) prev.innerHTML = '<img src="' + cs.imageUrl + '" style="width:100%;border-radius:6px;margin-top:6px;max-height:80px;object-fit:cover;">';
+  }
+  const opacityRange = document.getElementById('cardOpacityRange');
+  const opacityVal = document.getElementById('cardOpacityVal');
+  if (opacityRange && cs.opacity !== undefined) {
+    const pct = Math.round(cs.opacity * 100);
+    opacityRange.value = pct;
+    if (opacityVal) opacityVal.textContent = pct + '%';
   }
 }
 

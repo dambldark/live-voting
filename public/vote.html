@@ -133,6 +133,15 @@
   .revote-btn:hover { background: rgba(99,102,241,0.1); }
 
   .connecting { color: #444; font-size: 14px; text-align: center; padding: 60px 0; }
+
+  .q-image {
+    width: 100%; max-height: 200px; object-fit: contain;
+    border-radius: 12px; margin-bottom: 16px;
+  }
+  .opt-image {
+    width: 40px; height: 40px; object-fit: cover;
+    border-radius: 8px; flex-shrink: 0;
+  }
 </style>
 </head>
 <body>
@@ -233,24 +242,40 @@ function render(s) {
 
 function renderVoting(root, q, s) {
   const isMultiple = q.type === 'multiple';
-  const hint = isMultiple ? 'Можно выбрать несколько вариантов' : 'Выберите один вариант';
+  const isCount    = q.type === 'count';
+  const maxAns     = q.maxAnswers || 2;
+  let hint;
+  if (isMultiple) hint = 'Можно выбрать несколько вариантов';
+  else if (isCount) hint = 'Выберите ровно ' + maxAns + ' вариантов';
+  else hint = 'Выберите один вариант';
 
-  const optionsHtml = q.options.map(opt => `
+  const useSquare = isMultiple || isCount;
+  const optionsHtml = q.options.map(opt => {
+    const optImg = opt.imageUrl ? '<img class="opt-image" src="' + opt.imageUrl + '" alt="">' : '';
+    return `
     <div class="option ${selectedOptions.has(opt.id) ? 'selected' : ''}"
-         onclick="toggleOption('${opt.id}', ${isMultiple})">
-      <div class="check ${isMultiple ? 'square' : ''}"></div>
+         onclick="toggleOption('${opt.id}', '${q.type}', ${maxAns})">
+      <div class="check ${useSquare ? 'square' : ''}"></div>
+      ${optImg}
       <div class="option-text">${escHtml(opt.text)}</div>
     </div>
-  `).join('');
+  `;
+  }).join('');
+
+  const qImg = q.imageUrl ? '<img class="q-image" src="' + q.imageUrl + '" alt="">' : '';
+  let submitDisabled;
+  if (isCount) submitDisabled = selectedOptions.size !== maxAns;
+  else submitDisabled = selectedOptions.size === 0;
 
   root.innerHTML = `
     <div class="card">
       <div class="q-label">Вопрос <span class="live-badge">LIVE</span></div>
       <div class="q-text">${escHtml(q.text)}</div>
+      ${qImg}
       <div class="q-hint">${hint}</div>
       <div class="options">${optionsHtml}</div>
       <button class="submit-btn" id="submitBtn" onclick="submitVote('${q.id}')"
-        ${selectedOptions.size === 0 ? 'disabled' : ''}>
+        ${submitDisabled ? 'disabled' : ''}>
         Проголосовать
       </button>
     </div>`;
@@ -281,22 +306,30 @@ function startRevote(questionId) {
   if (currentState) renderVoting(document.getElementById('root'), currentState.currentQuestion, currentState);
 }
 
-function toggleOption(id, isMultiple) {
+function toggleOption(id, type, maxAnswers) {
   if (!currentState?.votingOpen) return;
-  if (isMultiple) {
+  if (type === 'multiple') {
     if (selectedOptions.has(id)) selectedOptions.delete(id);
     else selectedOptions.add(id);
+  } else if (type === 'count') {
+    if (selectedOptions.has(id)) {
+      selectedOptions.delete(id);
+    } else {
+      if (selectedOptions.size < maxAnswers) selectedOptions.add(id);
+    }
   } else {
     selectedOptions.clear();
     selectedOptions.add(id);
   }
-  // Re-render just options
   const q = currentState.currentQuestion;
   if (q) renderVoting(document.getElementById('root'), q, currentState);
 }
 
 async function submitVote(questionId) {
-  if (selectedOptions.size === 0) return;
+  const q = currentState && currentState.currentQuestion;
+  if (q && q.type === 'count') {
+    if (selectedOptions.size !== (q.maxAnswers || 2)) return;
+  } else if (selectedOptions.size === 0) return;
   const btn = document.getElementById('submitBtn');
   if (btn) { btn.disabled = true; btn.textContent = 'Отправка...'; }
 

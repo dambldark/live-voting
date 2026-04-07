@@ -32,6 +32,7 @@ const defaultState = () => ({
   votingOpen:false,
   backgroundSettings:{ type:'transparent', color:'#1a1d2e', imageUrl:null },
   fontSettings:{ family:"'Segoe UI', Arial, sans-serif", sizeScale:1.0, color:'#ffffff', bold:false, italic:false },
+  cardSettings:{ type:'default', color:'#0f111e', imageUrl:null, imageFit:'cover', opacity:0.88 },
   baseUrl:null
 });
 
@@ -45,7 +46,8 @@ function loadUserState(u) {
     userStates[u] = { ...def,...loaded,
       displaySettings:    {...def.displaySettings,    ...(loaded.displaySettings    ||{})},
       backgroundSettings: {...def.backgroundSettings, ...(loaded.backgroundSettings ||{})},
-      fontSettings:       {...def.fontSettings,       ...(loaded.fontSettings       ||{})}
+      fontSettings:       {...def.fontSettings,       ...(loaded.fontSettings       ||{})},
+      cardSettings:       {...def.cardSettings,       ...(loaded.cardSettings       ||{})}
     };
   } catch { userStates[u] = {...def}; }
   return userStates[u];
@@ -55,7 +57,7 @@ function getCurrentQuestion(s) { return s.questions.find(q=>q.id===s.currentQues
 function getPublicState(s) {
   return { currentQuestion:getCurrentQuestion(s), broadcastMode:s.broadcastMode,
     displaySettings:s.displaySettings, votingOpen:s.votingOpen,
-    backgroundSettings:s.backgroundSettings, fontSettings:s.fontSettings, baseUrl:s.baseUrl };
+    backgroundSettings:s.backgroundSettings, fontSettings:s.fontSettings, cardSettings:s.cardSettings, baseUrl:s.baseUrl };
 }
 const room = u => 'user:'+u.toLowerCase();
 
@@ -140,6 +142,8 @@ app.post('/api/vote',(req,res)=>{
   if(!question||question.id!==state.currentQuestionId) return res.json({success:false,error:'Вопрос не найден или не активен'});
   const ids=Array.isArray(optionIds)?optionIds:[optionIds];
   if(question.type==='single'&&ids.length>1) return res.json({success:false,error:'Можно выбрать только один вариант'});
+  if(question.type==='count'){const n=question.maxAnswers||2;if(ids.length!==n) return res.json({success:false,error:'Выберите ровно '+n+' вариантов'});}
+  if(question.type==='multiple'&&ids.length===0) return res.json({success:false,error:'Выберите хотя бы один вариант'});
   // Decrement previous votes if re-voting
   if(Array.isArray(previousOptionIds)&&previousOptionIds.length>0){
     previousOptionIds.forEach(id=>{ const opt=question.options.find(o=>o.id===id); if(opt&&opt.votes>0) opt.votes-=1; });
@@ -173,10 +177,10 @@ io.on('connection',(socket)=>{
   const guard=()=>socket.isPublic;
 
   socket.on('admin_get_state',()=>{ if(guard())return; socket.emit('admin_state',s); socket.emit('questions_update',s.questions); });
-  socket.on('add_question',(d)=>{ if(guard())return; const q={id:uuidv4(),text:d.text||'Новый вопрос',options:[],type:d.type||'single'}; s.questions.push(q); saveUserState(u); io.to(room(u)).emit('questions_update',s.questions); socket.emit('admin_state',s); });
-  socket.on('update_question',(d)=>{ if(guard())return; const q=s.questions.find(q=>q.id===d.id); if(q){if(d.text!==undefined)q.text=d.text;if(d.type!==undefined)q.type=d.type;saveUserState(u);io.to(room(u)).emit('questions_update',s.questions);io.to(room(u)).emit('state_update',getPublicState(s));} });
+  socket.on('add_question',(d)=>{ if(guard())return; const q={id:uuidv4(),text:d.text||'Новый вопрос',options:[],type:d.type||'single',imageUrl:null,maxAnswers:d.maxAnswers||2}; s.questions.push(q); saveUserState(u); io.to(room(u)).emit('questions_update',s.questions); socket.emit('admin_state',s); });
+  socket.on('update_question',(d)=>{ if(guard())return; const q=s.questions.find(q=>q.id===d.id); if(q){if(d.text!==undefined)q.text=d.text;if(d.type!==undefined)q.type=d.type;if(d.maxAnswers!==undefined)q.maxAnswers=d.maxAnswers;if(d.imageUrl!==undefined)q.imageUrl=d.imageUrl;saveUserState(u);io.to(room(u)).emit('questions_update',s.questions);io.to(room(u)).emit('state_update',getPublicState(s));} });
   socket.on('delete_question',(id)=>{ if(guard())return; s.questions=s.questions.filter(q=>q.id!==id); if(s.currentQuestionId===id){s.currentQuestionId=null;s.votingOpen=false;} saveUserState(u); io.to(room(u)).emit('questions_update',s.questions); io.to(room(u)).emit('state_update',getPublicState(s)); socket.emit('admin_state',s); });
-  socket.on('add_option',(d)=>{ if(guard())return; const q=s.questions.find(q=>q.id===d.questionId); if(q){q.options.push({id:uuidv4(),text:d.text||'Вариант',votes:0});saveUserState(u);io.to(room(u)).emit('questions_update',s.questions);io.to(room(u)).emit('state_update',getPublicState(s));} });
+  socket.on('add_option',(d)=>{ if(guard())return; const q=s.questions.find(q=>q.id===d.questionId); if(q){q.options.push({id:uuidv4(),text:d.text||'Вариант',votes:0,imageUrl:null});saveUserState(u);io.to(room(u)).emit('questions_update',s.questions);io.to(room(u)).emit('state_update',getPublicState(s));} });
   socket.on('update_option',(d)=>{ if(guard())return; s.questions.forEach(q=>{const o=q.options.find(o=>o.id===d.id);if(o&&d.text!==undefined)o.text=d.text;}); saveUserState(u); io.to(room(u)).emit('questions_update',s.questions); io.to(room(u)).emit('state_update',getPublicState(s)); });
   socket.on('delete_option',(d)=>{ if(guard())return; const q=s.questions.find(q=>q.id===d.questionId); if(q){q.options=q.options.filter(o=>o.id!==d.optionId);saveUserState(u);io.to(room(u)).emit('questions_update',s.questions);io.to(room(u)).emit('state_update',getPublicState(s));} });
   socket.on('set_current_question',(id)=>{ if(guard())return; s.currentQuestionId=id;s.votingOpen=false;saveUserState(u);io.to(room(u)).emit('state_update',getPublicState(s));socket.emit('admin_state',s); });
@@ -187,6 +191,9 @@ io.on('connection',(socket)=>{
   socket.on('update_background_settings',(d)=>{ if(guard())return; s.backgroundSettings={...s.backgroundSettings,...d};saveUserState(u);io.to(room(u)).emit('state_update',getPublicState(s));socket.emit('admin_state',s); });
   socket.on('set_base_url',(url)=>{ if(guard())return; s.baseUrl=url||null;saveUserState(u);io.to(room(u)).emit('state_update',getPublicState(s));socket.emit('admin_state',s); });
   socket.on('update_font_settings',(d)=>{ if(guard())return; s.fontSettings={...s.fontSettings,...d};saveUserState(u);io.to(room(u)).emit('state_update',getPublicState(s));socket.emit('admin_state',s); });
+  socket.on('update_card_settings',(d)=>{ if(guard())return; s.cardSettings={...s.cardSettings,...d};saveUserState(u);io.to(room(u)).emit('state_update',getPublicState(s));socket.emit('admin_state',s); });
+  socket.on('set_question_image',(d)=>{ if(guard())return; const q=s.questions.find(q=>q.id===d.id); if(q){q.imageUrl=d.imageUrl||null;saveUserState(u);io.to(room(u)).emit('questions_update',s.questions);io.to(room(u)).emit('state_update',getPublicState(s));} });
+  socket.on('set_option_image',(d)=>{ if(guard())return; s.questions.forEach(q=>{const o=q.options.find(o=>o.id===d.id);if(o)o.imageUrl=d.imageUrl||null;}); saveUserState(u);io.to(room(u)).emit('questions_update',s.questions);io.to(room(u)).emit('state_update',getPublicState(s)); });
 });
 
 const PORT=process.env.PORT||8080;
