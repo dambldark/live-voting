@@ -211,6 +211,9 @@ socket.on('state_update', (s) => {
 
 // ── Apply background + font CSS ─────────────────────────────
 function applySettings(s) {
+  // Reset render cache so display/font/bg changes force full redraw
+  _lastMode = null; _lastQuestionId = null; _lastQrUrl = null;
+  _lastQText = null; _lastQImg = null;
   const bg   = s.backgroundSettings || {};
   const font = s.fontSettings       || {};
   const card = s.cardSettings       || {};
@@ -293,17 +296,58 @@ function getVoteUrl() {
   return base + '/vote';
 }
 
+// ── Smart render — avoid full redraws on vote updates ────────
+let _lastMode        = null;
+let _lastQuestionId  = null;
+let _lastQrUrl       = null;
+let _lastQText       = null;
+let _lastQImg        = null;
+
 function render(s) {
   const scene = document.getElementById('scene');
-  if (!s.currentQuestion) {
-    scene.innerHTML = '<div class="empty-scene">Вопрос не выбран</div>';
+  const mode  = s.broadcastMode;
+  const q     = s.currentQuestion;
+
+  if (!q) {
+    if (_lastMode !== 'empty') {
+      scene.innerHTML = '<div class="empty-scene">Вопрос не выбран</div>';
+      _lastMode = 'empty'; _lastQuestionId = null; _lastQrUrl = null;
+      requestAnimationFrame(autoFit);
+    }
     return;
   }
-  const mode = s.broadcastMode;
-  if      (mode === 'qr')       renderQR(scene, s);
-  else if (mode === 'question') renderQuestion(scene, s);
-  else if (mode === 'both')     renderBoth(scene, s);
-  else if (mode === 'results')  renderResults(scene, s);
+
+  const modeChanged     = mode !== _lastMode;
+  const questionChanged = q.id !== _lastQuestionId;
+  const mustRedraw      = modeChanged || questionChanged;
+
+  if (mode === 'qr') {
+    const url = getVoteUrl();
+    if (mustRedraw || url !== _lastQrUrl) {
+      renderQR(scene, s);
+      _lastQrUrl = url;
+      requestAnimationFrame(autoFit);
+    }
+    // votes don't affect QR view — skip redraw
+  } else if (mode === 'question') {
+    if (mustRedraw || q.text !== _lastQText || q.imageUrl !== _lastQImg) {
+      renderQuestion(scene, s);
+      _lastQText = q.text; _lastQImg = q.imageUrl;
+      requestAnimationFrame(autoFit);
+    }
+  } else if (mode === 'both') {
+    const url = getVoteUrl();
+    if (mustRedraw || url !== _lastQrUrl || q.text !== _lastQText || q.imageUrl !== _lastQImg) {
+      renderBoth(scene, s);
+      _lastQrUrl = url; _lastQText = q.text; _lastQImg = q.imageUrl;
+      requestAnimationFrame(autoFit);
+    }
+  } else if (mode === 'results') {
+    renderResults(scene, s);  // has its own in-place logic
+  }
+
+  _lastMode       = mode;
+  _lastQuestionId = q.id;
 }
 
 function renderQR(scene, s) {
