@@ -35,13 +35,13 @@
     animation: fadeIn 0.5s ease;
   }
   .qr-label {
-    font-size: calc(clamp(14px, 2.5vw, 22px) * var(--text-scale, 1));
+    font-size: calc(clamp(14px, 2.5vw, 22px) * var(--text-scale, 1) * var(--text-only-scale, 1));
     color: #a5b4fc; font-weight: 500; text-align: center;
     font-style: var(--font-italic, normal);
   }
   #qrCanvas { border-radius: 12px; }
   .qr-url {
-    font-size: calc(clamp(12px, 1.8vw, 18px) * var(--text-scale, 1));
+    font-size: calc(clamp(12px, 1.8vw, 18px) * var(--text-scale, 1) * var(--text-only-scale, 1));
     color: #6366f1; font-weight: 600; letter-spacing: 0.5px;
   }
 
@@ -57,12 +57,12 @@
     animation: fadeIn 0.5s ease;
   }
   .question-label {
-    font-size: calc(clamp(11px, 1.5vw, 16px) * var(--text-scale, 1));
+    font-size: calc(clamp(11px, 1.5vw, 16px) * var(--text-scale, 1) * var(--text-only-scale, 1));
     text-transform: uppercase; letter-spacing: 2px;
     color: #6366f1; margin-bottom: 16px; font-weight: 600;
   }
   .question-text {
-    font-size: calc(clamp(22px, 4.5vw, 56px) * var(--text-scale, 1));
+    font-size: calc(clamp(22px, 4.5vw, 56px) * var(--text-scale, 1) * var(--text-only-scale, 1));
     font-weight: var(--font-weight, 700);
     font-style: var(--font-italic, normal);
     line-height: 1.2; color: var(--text-color, #fff);
@@ -81,7 +81,7 @@
     animation: fadeIn 0.5s ease;
   }
   .both-qr { flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 10px; }
-  .both-qr .qr-url { font-size: calc(clamp(11px, 1.3vw, 15px) * var(--text-scale, 1)); }
+  .both-qr .qr-url { font-size: calc(clamp(11px, 1.3vw, 15px) * var(--text-scale, 1) * var(--text-only-scale, 1)); }
   .both-question { flex: 1; }
   .both-question .question-label { text-align: left; }
   .both-question .question-text { text-align: left; }
@@ -98,13 +98,13 @@
   }
   .results-header { margin-bottom: clamp(16px, 2.5vw, 32px); }
   .results-question {
-    font-size: calc(clamp(16px, 2.8vw, 34px) * var(--text-scale, 1));
+    font-size: calc(clamp(16px, 2.8vw, 34px) * var(--text-scale, 1) * var(--text-only-scale, 1));
     font-weight: var(--font-weight, 700);
     font-style: var(--font-italic, normal);
     line-height: 1.3; color: var(--text-color, #fff); margin-bottom: 8px;
   }
   .results-meta {
-    font-size: calc(clamp(11px, 1.4vw, 16px) * var(--text-scale, 1));
+    font-size: calc(clamp(11px, 1.4vw, 16px) * var(--text-scale, 1) * var(--text-only-scale, 1));
     color: #666; display: flex; gap: 16px;
   }
   .results-meta span { color: #a5b4fc; }
@@ -134,20 +134,20 @@
     display: flex; align-items: center; gap: 10px;
   }
   .option-rank {
-    font-size: calc(clamp(10px, 1.2vw, 14px) * var(--text-scale, 1));
+    font-size: calc(clamp(13px, 1.6vw, 18px) * var(--text-scale, 1) * var(--text-only-scale, 1));
     color: #6366f1; font-weight: 700;
-    width: clamp(18px, 2vw, 26px); text-align: center; flex-shrink: 0;
+    width: clamp(22px, 2.4vw, 30px); text-align: center; flex-shrink: 0;
   }
   .option-text-wrap { flex: 1; min-width: 0; }
   .option-text-val {
-    font-size: calc(clamp(13px, 2vw, 22px) * var(--text-scale, 1));
+    font-size: calc(clamp(13px, 2vw, 22px) * var(--text-scale, 1) * var(--text-only-scale, 1));
     font-weight: var(--font-weight, 600);
     font-style: var(--font-italic, normal);
     color: var(--text-color, #fff);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .option-value {
-    font-size: calc(clamp(16px, 2.5vw, 30px) * var(--text-scale, 1));
+    font-size: calc(clamp(16px, 2.5vw, 30px) * var(--text-scale, 1) * var(--text-only-scale, 1));
     font-weight: 800; color: #a5b4fc;
     white-space: nowrap; flex-shrink: 0;
   }
@@ -255,7 +255,8 @@ function applySettings(s) {
   loadGoogleFontIfNeeded(family);
 
   // Scale (1.0 = 100%)
-  const scale   = font.sizeScale !== undefined ? font.sizeScale : 1.0;
+  const scale     = font.sizeScale  !== undefined ? font.sizeScale  : 1.0;
+  const textOnly  = font.textScale  !== undefined ? font.textScale  : 1.0;
   const color   = font.color    || '#ffffff';
   const weight  = font.bold     ? '700' : 'normal';
   const italic  = font.italic   ? 'italic' : 'normal';
@@ -263,6 +264,7 @@ function applySettings(s) {
   const fontCSS = `
     :root {
       --text-scale:  ${scale};
+      --text-only-scale: ${textOnly};
       --text-color:  ${color};
       --font-weight: ${weight};
       --font-italic: ${italic};
@@ -433,7 +435,7 @@ function renderResults(scene, s) {
       <div class="option-bar ${isLeading ? 'leading' : ''}" data-id="${opt.id}">
         <div class="option-fill" style="width:${fillPct}%"></div>
         <div class="option-content">
-          <div class="option-rank">#${rank}</div>
+          <div class="option-rank">${rank}</div>
           <div class="option-text-wrap">
             ${opt.imageUrl ? '<img class="option-img" src="' + opt.imageUrl + '" alt="">' : ''}
             <div class="option-text-val">${safeHtml(opt.text)}</div>
@@ -487,7 +489,7 @@ function updateResultsInPlace(scene, q, ds, totalVotes, maxVotes, sorted) {
 
     // Rank
     const rankEl = bar.querySelector('.option-rank');
-    if (rankEl) rankEl.textContent = '#' + rank;
+    if (rankEl) rankEl.textContent = rank;
 
     // Value
     const valEl = bar.querySelector('.option-value');
